@@ -1,66 +1,217 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import styles from "./weather.module.css";
+import type { DayForecast, WeatherApiResponse, WeatherCategory } from "@/app/lib/types";
+
+const CATEGORY_BG: Record<WeatherCategory, string> = {
+  clear: "bgClear",
+  cloudy: "bgCloudy",
+  "light-rain": "bgLightRain",
+  "heavy-rain": "bgHeavyRain",
+  thunderstorm: "bgThunderstorm",
+};
+
+const CATEGORY_EMOJI: Record<WeatherCategory, string> = {
+  clear: "🌤️",
+  cloudy: "🌥️",
+  "light-rain": "☔",
+  "heavy-rain": "☔",
+  thunderstorm: "⚡☔",
+};
+
+const CATEGORY_RAINDROPS: Partial<Record<WeatherCategory, string>> = {
+  "light-rain": "💧",
+  "heavy-rain": "💧💧💧",
+  thunderstorm: "💧💧💧",
+};
+
+function backgroundClassFor(category: WeatherCategory): string {
+  return styles[CATEGORY_BG[category]] ?? styles.bgDefault;
+}
+
+function formatDateLabel(day: DayForecast): string {
+  const [, month, date] = day.date.split("-");
+  return `${parseInt(month, 10)}月${parseInt(date, 10)}日（${day.weekday}）`;
+}
 
 export default function Home() {
+  const [data, setData] = useState<WeatherApiResponse | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [snapNotice, setSnapNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const res = await fetch("/api/weather");
+        const json = await res.json();
+        if (cancelled) return;
+
+        if (!res.ok) {
+          setErrorMsg(json.error ?? "天気情報の取得に失敗しました。");
+          setLoading(false);
+          return;
+        }
+
+        const payload = json as WeatherApiResponse;
+        setData(payload);
+        if (payload.days.length > 0) {
+          setSelectedDate(payload.days[0].date);
+        }
+        setLoading(false);
+      } catch {
+        if (!cancelled) {
+          setErrorMsg("天気情報の取得に失敗しました（通信エラー）。");
+          setLoading(false);
+        }
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedDay = useMemo(
+    () => data?.days.find((d) => d.date === selectedDate) ?? null,
+    [data, selectedDate]
+  );
+
+  const bgClass = selectedDay ? backgroundClassFor(selectedDay.category) : styles.bgDefault;
+  const showRainOverlay =
+    selectedDay?.category === "light-rain" ||
+    selectedDay?.category === "heavy-rain" ||
+    selectedDay?.category === "thunderstorm";
+  const rainDensityClass =
+    selectedDay?.category === "light-rain" ? styles.rainLight : styles.rainHeavy;
+
+  function handleDateInputChange(value: string) {
+    if (!data || data.days.length === 0) return;
+    const exact = data.days.find((d) => d.date === value);
+    if (exact) {
+      setSnapNotice(null);
+      setSelectedDate(value);
+      return;
+    }
+
+    // Snap to the nearest available forecast day (free tier only covers ~5 days).
+    const targetMs = new Date(value).getTime();
+    let nearest = data.days[0];
+    let bestDiff = Infinity;
+    for (const day of data.days) {
+      const diff = Math.abs(new Date(day.date).getTime() - targetMs);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        nearest = day;
+      }
+    }
+    setSelectedDate(nearest.date);
+    setSnapNotice(
+      `${value} の予報はまだ提供されていないため、直近の予報日（${formatDateLabel(nearest)}）を表示しています。`
+    );
+  }
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <main className={`${styles.page} ${bgClass}`}>
+      {showRainOverlay && <div className={`${styles.rainOverlay} ${rainDensityClass}`} />}
+      {selectedDay?.category === "thunderstorm" && (
+        <div className={styles.lightningOverlay} />
+      )}
+      <div className={styles.container}>
+        <header className={styles.header}>
+          <h1 className={styles.title}>{data?.location ?? "東京都府中市"} の天気予報</h1>
+          <p className={styles.subtitle}>日付を選んで、その日の予報を確認できます</p>
+        </header>
+
+        {loading && <div className={styles.message}>読み込み中...</div>}
+
+        {errorMsg && (
+          <div className={`${styles.message} ${styles.messageError}`}>{errorMsg}</div>
+        )}
+
+        {data && data.days.length > 0 && (
+          <>
+            <div className={styles.dateRow}>
+              <input
+                type="date"
+                className={styles.dateInput}
+                value={selectedDate ?? ""}
+                min={data.days[0].date}
+                max={data.days[data.days.length - 1].date}
+                onChange={(e) => handleDateInputChange(e.target.value)}
+              />
+            </div>
+
+            <div className={styles.dayStrip}>
+              {data.days.map((day) => (
+                <button
+                  key={day.date}
+                  type="button"
+                  className={`${styles.dayButton} ${
+                    day.date === selectedDate ? styles.dayButtonActive : ""
+                  }`}
+                  onClick={() => {
+                    setSnapNotice(null);
+                    setSelectedDate(day.date);
+                  }}
+                >
+                  <span>{day.weekday}</span>
+                  <span className={styles.dayButtonIcon} role="img" aria-label={day.categoryLabel}>
+                    {CATEGORY_EMOJI[day.category]}
+                  </span>
+                  <span>{Math.round(day.temp)}°</span>
+                </button>
+              ))}
+            </div>
+
+            {snapNotice && <div className={styles.message}>{snapNotice}</div>}
+
+            {selectedDay && (
+              <section className={styles.card}>
+                <div className={styles.cardDate}>{formatDateLabel(selectedDay)}</div>
+                <div
+                  className={styles.cardIcon}
+                  role="img"
+                  aria-label={selectedDay.categoryLabel}
+                >
+                  {CATEGORY_EMOJI[selectedDay.category]}
+                </div>
+                {CATEGORY_RAINDROPS[selectedDay.category] && (
+                  <div className={styles.rainDrops} aria-hidden="true">
+                    {CATEGORY_RAINDROPS[selectedDay.category]}
+                  </div>
+                )}
+                <div className={styles.cardTemp}>{selectedDay.temp}°C</div>
+                <div className={styles.cardDescription}>{selectedDay.categoryLabel}</div>
+                <div className={styles.cardMinMax}>
+                  最高 {selectedDay.tempMax}° / 最低 {selectedDay.tempMin}°
+                </div>
+
+                <div className={styles.statsRow}>
+                  <div className={styles.statBox}>
+                    <div className={styles.statLabel}>湿度</div>
+                    <div className={styles.statValue}>{selectedDay.humidity}%</div>
+                  </div>
+                  <div className={styles.statBox}>
+                    <div className={styles.statLabel}>降水確率</div>
+                    <div className={styles.statValue}>{selectedDay.pop}%</div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            <p className={styles.footer}>
+              最終更新: {data.updatedAt ? new Date(data.updatedAt).toLocaleString("ja-JP") : "-"}
+              　/　データ提供: OpenWeatherMap
+            </p>
+          </>
+        )}
+      </div>
+    </main>
   );
 }

@@ -1,0 +1,288 @@
+.page {
+  position: relative;
+  overflow: hidden;
+  min-height: 100svh;
+  display: flex;
+  justify-content: center;
+  padding: 32px 16px 64px;
+  transition: background 0.6s ease;
+  background-size: cover;
+  background-attachment: fixed;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  color: #1a1a1a;
+}
+
+.bgClear {
+  background: linear-gradient(180deg, #4facfe 0%, #a6e3ff 45%, #ffe9a8 100%);
+}
+
+.bgCloudy {
+  background: linear-gradient(180deg, #93a5b8 0%, #cfd9df 55%, #e8edf1 100%);
+}
+
+.bgLightRain {
+  background: linear-gradient(180deg, #6e8fa8 0%, #9db3c4 50%, #c4d3dc 100%);
+  color: #1a2a33;
+}
+
+.bgHeavyRain {
+  background: linear-gradient(180deg, #33454f 0%, #4c626e 50%, #6b8290 100%);
+  color: #f5f7f8;
+}
+
+.bgThunderstorm {
+  background: linear-gradient(180deg, #232538 0%, #3a3d5c 50%, #565a7d 100%);
+  color: #f5f7f8;
+}
+
+.bgDefault {
+  background: linear-gradient(180deg, #6a85b6 0%, #bac8e0 100%);
+}
+
+.rainOverlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.rainLight {
+  background-image: repeating-linear-gradient(
+    115deg,
+    transparent 0 14px,
+    rgba(255, 255, 255, 0.35) 14px 15px
+  );
+  background-size: 100% 140%;
+  opacity: 0.4;
+  animation: rainFall 0.9s linear infinite;
+}
+
+.rainHeavy {
+  background-image: repeating-linear-gradient(
+    115deg,
+    transparent 0 7px,
+    rgba(255, 255, 255, 0.5) 7px 8.5px
+  );
+  background-size: 100% 140%;
+  opacity: 0.6;
+  animation: rainFall 0.5s linear infinite;
+}
+
+@keyframes rainFall {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: -60px 90px;
+  }
+}
+
+.lightningOverlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: #ffffff;
+  opacity: 0;
+  animation: lightningFlash 5s ease-in-out infinite;
+}
+
+@keyframes lightningFlash {
+  0%,
+  91%,
+  100% {
+    opacity: 0;
+  }
+  92% {
+    opacity: 0.85;
+  }
+  93% {
+    opacity: 0.1;
+  }
+  94% {
+    opacity: 0.6;
+  }
+  96% {
+    opacity: 0;
+  }
+}
+
+.container {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.header {
+  text-align: center;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  opacity: 0.8;
+  font-size: 0.9rem;
+}
+
+.dateRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dateInput {
+  border: none;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 0.95rem;
+  background: rgba(255, 255, 255, 0.85);
+  color: #1a1a1a;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.dayStrip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.dayButton {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 14px;
+  min-width: 68px;
+  background: rgba(255, 255, 255, 0.55);
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.dayButton:hover {
+  background: rgba(255, 255, 255, 0.75);
+  transform: translateY(-2px);
+}
+
+.dayButtonActive {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+  font-weight: 700;
+}
+
+.dayButtonIcon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(10px);
+  border-radius: 24px;
+  padding: 28px 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.cardDate {
+  font-size: 1rem;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.cardIcon {
+  font-size: 5.5rem;
+  line-height: 1;
+  margin: -4px 0;
+}
+
+.rainDrops {
+  font-size: 1rem;
+  letter-spacing: 4px;
+  opacity: 0.85;
+  margin-top: -8px;
+}
+
+.cardTemp {
+  font-size: 3.4rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.cardDescription {
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.cardMinMax {
+  font-size: 0.95rem;
+  opacity: 0.85;
+}
+
+.statsRow {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.statBox {
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 14px;
+  padding: 12px 20px;
+  min-width: 110px;
+}
+
+.statLabel {
+  font-size: 0.75rem;
+  opacity: 0.85;
+}
+
+.statValue {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.message {
+  text-align: center;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 14px;
+  padding: 16px 20px;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #1a1a1a;
+  white-space: pre-line;
+}
+
+.messageError {
+  background: rgba(255, 235, 235, 0.9);
+  color: #7a1f1f;
+}
+
+.footer {
+  text-align: center;
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
