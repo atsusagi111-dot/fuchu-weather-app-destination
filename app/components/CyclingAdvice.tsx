@@ -13,6 +13,11 @@ import {
 const INSUFFICIENT_DATA_MESSAGE =
   "十分な天気予報データを取得できないため、最新の天気予報を確認してください。";
 
+function formatDateShort(dateStr: string): string {
+  const [, month, day] = dateStr.split("-");
+  return `${parseInt(month, 10)}月${parseInt(day, 10)}日`;
+}
+
 export default function CyclingAdvice({
   locationLabel,
   hours,
@@ -48,7 +53,14 @@ export default function CyclingAdvice({
     return (
       <div className={styles.adviceBlock}>
         <div className={styles.locationLabel}>🚲 天気からのおすすめ</div>
+        <div className={styles.adviceSubLabel}>
+          対象日: {formatDateShort(targetDate)}（{locationLabel}）
+        </div>
         <div className={styles.message}>{INSUFFICIENT_DATA_MESSAGE}</div>
+        <p className={styles.adviceNote}>
+          ※ {formatDateShort(targetDate)}の予報データが、入力した時間から離れすぎているため判断できませんでした。
+          上のカレンダーで日付を変更するか、出発・帰宅時間を予報のある時間帯に近づけてみてください。
+        </p>
       </div>
     );
   }
@@ -64,7 +76,9 @@ export default function CyclingAdvice({
       <div className={styles.adviceTitle}>
         {recommendation.icon} 今日の移動アドバイス
       </div>
-      <div className={styles.adviceSubLabel}>{locationLabel}への移動をもとに判断</div>
+      <div className={styles.adviceSubLabel}>
+        対象日: {formatDateShort(targetDate)}（{locationLabel}への移動をもとに判断）
+      </div>
 
       <div className={styles.adviceLegRow}>
         <div className={styles.adviceLeg}>

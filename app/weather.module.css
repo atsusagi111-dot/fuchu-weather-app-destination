@@ -527,6 +527,14 @@
   font-weight: 700;
 }
 
+.adviceHint {
+  margin: 0;
+  font-size: 0.75rem;
+  opacity: 0.85;
+  text-align: center;
+  line-height: 1.5;
+}
+
 .timeRow {
   display: flex;
   gap: 12px;
