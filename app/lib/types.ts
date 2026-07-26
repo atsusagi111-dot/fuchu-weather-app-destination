@@ -12,6 +12,8 @@ export type HourForecast = {
   temp: number;
   humidity: number;
   pop: number; // 0-100 (%)
+  weatherId: number; // OpenWeatherMapの天気コード（自転車アドバイス機能でのより細かい判定用）
+  windSpeed: number; // m/s
   weatherMain: string;
   weatherDescription: string;
   icon: string;

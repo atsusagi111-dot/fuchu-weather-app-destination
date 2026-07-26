@@ -21,6 +21,7 @@ type OwmListItem = {
     humidity: number;
   };
   weather: OwmWeather[];
+  wind?: { speed: number };
   pop: number;
   dt_txt: string;
 };
@@ -82,6 +83,7 @@ type OwmCurrentResponse = {
   timezone: number;
   main: { temp: number; humidity: number };
   weather: OwmWeather[];
+  wind?: { speed: number };
 };
 
 // OpenWeatherMapの実況(Current Weather)APIを使って「今」の気温・湿度・天気を取得する。
@@ -123,6 +125,8 @@ async function fetchCurrentConditions(
     temp: Math.round(data.main.temp),
     humidity: data.main.humidity,
     pop: 0, // 実況APIには降水確率が無いため、呼び出し側で直近の予報値に差し替える
+    weatherId: weather.id,
+    windSpeed: data.wind?.speed ?? 0,
     weatherMain: weather.main,
     weatherDescription: weather.description,
     icon: weather.icon,
@@ -223,6 +227,8 @@ export async function fetchForecast(
             temp: Math.round(item.main.temp),
             humidity: item.main.humidity,
             pop: Math.round(item.pop * 100),
+            weatherId: itemWeather.id,
+            windSpeed: item.wind?.speed ?? 0,
             weatherMain: itemWeather.main,
             weatherDescription: itemWeather.description,
             icon: itemWeather.icon,

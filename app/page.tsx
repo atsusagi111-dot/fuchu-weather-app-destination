@@ -5,6 +5,7 @@ import styles from "./weather.module.css";
 import type { DayForecast, WeatherApiResponse, WeatherCategory } from "@/app/lib/types";
 import { CATEGORY_EMOJI, CATEGORY_RAINDROPS } from "@/app/lib/ui";
 import HourlyForecast from "@/app/components/HourlyForecast";
+import CyclingAdvice from "@/app/components/CyclingAdvice";
 
 const CATEGORY_BG: Record<WeatherCategory, string> = {
   clear: "bgClear",
@@ -35,6 +36,9 @@ export default function Home() {
   const [destinationError, setDestinationError] = useState<string | null>(null);
   const [destinationLoading, setDestinationLoading] = useState(false);
   const [hasSearchedDestination, setHasSearchedDestination] = useState(false);
+
+  const [departureTime, setDepartureTime] = useState("");
+  const [returnTime, setReturnTime] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -113,6 +117,11 @@ export default function Home() {
     const nextDay = idx >= 0 ? destinationData.days[idx + 1] : undefined;
     return [...destinationSelectedDay.hours, ...(nextDay?.hours ?? [])];
   }, [destinationData, destinationSelectedDay]);
+
+  // 自転車アドバイスは、目的地が検索されていればその地点、無ければ府中市を対象にする。
+  const adviceLocationLabel = destinationData?.location ?? "府中市";
+  const adviceHours = destinationData ? destinationHourlyWindow : fuchuHourlyWindow;
+  const adviceTargetDate = destinationData ? destinationSelectedDay?.date ?? null : selectedDay?.date ?? null;
 
   const bgClass = selectedDay ? backgroundClassFor(selectedDay.category) : styles.bgDefault;
   const showRainOverlay =
@@ -317,6 +326,27 @@ export default function Home() {
                 )}
               </form>
 
+              <div className={styles.timeRow}>
+                <label className={styles.timeField}>
+                  <span className={styles.timeFieldLabel}>出発時間</span>
+                  <input
+                    type="time"
+                    className={styles.timeInput}
+                    value={departureTime}
+                    onChange={(e) => setDepartureTime(e.target.value)}
+                  />
+                </label>
+                <label className={styles.timeField}>
+                  <span className={styles.timeFieldLabel}>帰宅時間</span>
+                  <input
+                    type="time"
+                    className={styles.timeInput}
+                    value={returnTime}
+                    onChange={(e) => setReturnTime(e.target.value)}
+                  />
+                </label>
+              </div>
+
               {destinationLoading && (
                 <div className={styles.message}>目的地の天気を取得中...</div>
               )}
@@ -364,6 +394,18 @@ export default function Home() {
                 </section>
               )}
             </section>
+
+            {departureTime && returnTime && (
+              <section className={styles.adviceSection}>
+                <CyclingAdvice
+                  locationLabel={adviceLocationLabel}
+                  hours={adviceHours}
+                  targetDate={adviceTargetDate}
+                  departureTime={departureTime}
+                  returnTime={returnTime}
+                />
+              </section>
+            )}
 
             <p className={styles.footer}>
               最終更新: {data.updatedAt ? new Date(data.updatedAt).toLocaleString("ja-JP") : "-"}
