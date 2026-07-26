@@ -349,13 +349,6 @@
   border-top: 1px solid rgba(255, 255, 255, 0.35);
 }
 
-.sectionTitle {
-  margin: 0;
-  text-align: center;
-  font-size: 1.05rem;
-  font-weight: 700;
-}
-
 .hourlyBlock {
   background: rgba(255, 255, 255, 0.28);
   backdrop-filter: blur(10px);
@@ -364,6 +357,40 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.hourlyHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hourlyLegend {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  opacity: 0.9;
+}
+
+.legendLineSolid,
+.legendLineDashed {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  border-top: 2px solid currentColor;
+}
+
+.legendLineDashed {
+  border-top-style: dashed;
 }
 
 .hourlyIconRow {
@@ -419,23 +446,37 @@
   line-height: 1;
 }
 
+.hourlyIconEmojiSecondary {
+  font-size: 0.9rem;
+  line-height: 1;
+  opacity: 0.85;
+}
+
 .hourlyTooltip {
   min-height: 1.4em;
   font-size: 0.85rem;
   text-align: center;
   opacity: 0.9;
+}
+
+.hourlyTooltipStack {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  justify-content: center;
+  flex-direction: column;
+  gap: 3px;
   align-items: center;
 }
 
-.hourlyTooltipItem {
+.hourlyTooltipRow {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  white-space: nowrap;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.hourlyTooltipLocation {
+  font-weight: 700;
+  opacity: 0.85;
 }
 
 .hourlyDot {

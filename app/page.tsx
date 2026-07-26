@@ -282,6 +282,17 @@ export default function Home() {
               </section>
             )}
 
+            <section className={styles.hourlySection}>
+              <HourlyForecast
+                primary={{ label: "府中市", hours: fuchuHourlyWindow }}
+                secondary={
+                  destinationSelectedDay && destinationData
+                    ? { label: destinationData.location, hours: destinationHourlyWindow }
+                    : null
+                }
+              />
+            </section>
+
             <section className={styles.destinationSection}>
               <div className={styles.locationLabel}>目的地の天気</div>
               <form className={styles.destinationForm} onSubmit={handleDestinationSearch}>
@@ -351,14 +362,6 @@ export default function Home() {
                     </div>
                   </div>
                 </section>
-              )}
-            </section>
-
-            <section className={styles.hourlySection}>
-              <h2 className={styles.sectionTitle}>時間ごとの天気予報</h2>
-              {selectedDay && <HourlyForecast title="府中市" hours={fuchuHourlyWindow} />}
-              {destinationSelectedDay && destinationData && (
-                <HourlyForecast title={destinationData.location} hours={destinationHourlyWindow} />
               )}
             </section>
 

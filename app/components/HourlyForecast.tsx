@@ -20,9 +20,18 @@ const PAD_RIGHT = 8;
 const PAD_TOP = 16;
 const PAD_BOTTOM = 18;
 
+export type LocationSeries = {
+  label: string;
+  hours: HourForecast[];
+};
+
 function formatShortDate(dateKey: string): string {
   const [, month, day] = dateKey.split("-");
   return `${parseInt(month, 10)}/${parseInt(day, 10)}`;
+}
+
+function hourKey(h: HourForecast): string {
+  return `${h.date} ${h.time}`;
 }
 
 // 表示するデータ点が多いとき(2日分をつなげた場合など)に、横軸ラベルが
@@ -57,8 +66,25 @@ function buildSmoothPath(coords: { x: number; y: number }[]): string {
   return d;
 }
 
+// null (対応データなし)で分断された点列を、連続する区間ごとに分けてパスを作る。
+function buildSegments(coords: ({ x: number; y: number } | null)[]): { x: number; y: number }[][] {
+  const segments: { x: number; y: number }[][] = [];
+  let current: { x: number; y: number }[] = [];
+  for (const c of coords) {
+    if (c) {
+      current.push(c);
+    } else if (current.length) {
+      segments.push(current);
+      current = [];
+    }
+  }
+  if (current.length) segments.push(current);
+  return segments;
+}
+
 function MetricChart({
-  hours,
+  primaryHours,
+  secondaryByKey,
   metricKey,
   color,
   fixedDomain,
@@ -66,7 +92,8 @@ function MetricChart({
   activeIndex,
   onActive,
 }: {
-  hours: HourForecast[];
+  primaryHours: HourForecast[];
+  secondaryByKey: Map<string, HourForecast> | null;
   metricKey: MetricKey;
   color: string;
   fixedDomain?: [number, number];
@@ -74,13 +101,18 @@ function MetricChart({
   activeIndex: number | null;
   onActive: (index: number | null) => void;
 }) {
-  const values = hours.map((h) => h[metricKey]);
-  const n = values.length;
+  const n = primaryHours.length;
   if (n === 0) return null;
 
-  const [rawMin, rawMax] = fixedDomain ?? [Math.min(...values), Math.max(...values)];
+  const primaryValues = primaryHours.map((h) => h[metricKey]);
+  const secondaryValues: (number | null)[] = primaryHours.map((h) => {
+    const match = secondaryByKey?.get(hourKey(h));
+    return match ? match[metricKey] : null;
+  });
+
+  const allValues = [...primaryValues, ...secondaryValues.filter((v): v is number => v !== null)];
+  const [rawMin, rawMax] = fixedDomain ?? [Math.min(...allValues), Math.max(...allValues)];
   const span = rawMax - rawMin || 1;
-  // データ変化が小さい日でも線が潰れないよう、自動スケールの場合は少し余白を持たせる。
   const min = fixedDomain ? rawMin : rawMin - span * 0.15;
   const max = fixedDomain ? rawMax : rawMax + span * 0.15;
   const range = max - min || 1;
@@ -89,8 +121,13 @@ function MetricChart({
     n === 1 ? CHART_WIDTH / 2 : PAD_LEFT + (i * (CHART_WIDTH - PAD_LEFT - PAD_RIGHT)) / (n - 1);
   const yFor = (v: number) => CHART_HEIGHT - PAD_BOTTOM - ((v - min) / range) * (CHART_HEIGHT - PAD_TOP - PAD_BOTTOM);
 
-  const coords = values.map((v, i) => ({ x: xFor(i), y: yFor(v) }));
-  const path = buildSmoothPath(coords);
+  const primaryCoords = primaryValues.map((v, i) => ({ x: xFor(i), y: yFor(v) }));
+  const primaryPath = buildSmoothPath(primaryCoords);
+
+  const secondaryCoords: ({ x: number; y: number } | null)[] = secondaryValues.map((v, i) =>
+    v === null ? null : { x: xFor(i), y: yFor(v) }
+  );
+  const secondarySegments = buildSegments(secondaryCoords);
 
   const midValue = fixedDomain ? (fixedDomain[0] + fixedDomain[1]) / 2 : (rawMin + rawMax) / 2;
   const yTicks = Array.from(new Set([rawMin, midValue, rawMax].map((v) => Math.round(v))));
@@ -101,7 +138,7 @@ function MetricChart({
     const relX = ((clientX - rect.left) / rect.width) * CHART_WIDTH;
     let nearest = 0;
     let bestDiff = Infinity;
-    coords.forEach((c, i) => {
+    primaryCoords.forEach((c, i) => {
       const diff = Math.abs(c.x - relX);
       if (diff < bestDiff) {
         bestDiff = diff;
@@ -116,7 +153,7 @@ function MetricChart({
       viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
       className={styles.chartSvg}
       role="img"
-      aria-label={`${hours[0]?.date ?? ""}以降の${metricKey}の推移`}
+      aria-label={`${metricKey}の時間ごとの推移`}
       onMouseMove={(e) => handlePointer(e.clientX, e.currentTarget.getBoundingClientRect())}
       onMouseLeave={() => onActive(null)}
       onClick={(e) => handlePointer(e.clientX, e.currentTarget.getBoundingClientRect())}
@@ -143,64 +180,77 @@ function MetricChart({
       })}
 
       {/* X軸・Y軸の軸線 */}
-      <line
-        x1={PAD_LEFT}
-        y1={PAD_TOP - 4}
-        x2={PAD_LEFT}
-        y2={CHART_HEIGHT - PAD_BOTTOM}
-        stroke="currentColor"
-        strokeOpacity={0.35}
-        strokeWidth={1}
-      />
-      <line
-        x1={PAD_LEFT}
-        y1={CHART_HEIGHT - PAD_BOTTOM}
-        x2={CHART_WIDTH - PAD_RIGHT}
-        y2={CHART_HEIGHT - PAD_BOTTOM}
-        stroke="currentColor"
-        strokeOpacity={0.35}
-        strokeWidth={1}
-      />
+      <line x1={PAD_LEFT} y1={PAD_TOP - 4} x2={PAD_LEFT} y2={CHART_HEIGHT - PAD_BOTTOM} stroke="currentColor" strokeOpacity={0.35} strokeWidth={1} />
+      <line x1={PAD_LEFT} y1={CHART_HEIGHT - PAD_BOTTOM} x2={CHART_WIDTH - PAD_RIGHT} y2={CHART_HEIGHT - PAD_BOTTOM} stroke="currentColor" strokeOpacity={0.35} strokeWidth={1} />
 
       {/* 日付が変わる位置の目印 */}
-      {dayBoundaryIndex >= 0 && coords[dayBoundaryIndex] && (
+      {dayBoundaryIndex >= 0 && primaryCoords[dayBoundaryIndex] && (
         <>
           <line
-            x1={coords[dayBoundaryIndex].x}
+            x1={primaryCoords[dayBoundaryIndex].x}
             y1={PAD_TOP - 4}
-            x2={coords[dayBoundaryIndex].x}
+            x2={primaryCoords[dayBoundaryIndex].x}
             y2={CHART_HEIGHT - PAD_BOTTOM}
             stroke="currentColor"
             strokeOpacity={0.4}
             strokeWidth={1}
             strokeDasharray="3 3"
           />
-          <text
-            x={coords[dayBoundaryIndex].x}
-            y={PAD_TOP - 6}
-            textAnchor="middle"
-            fontSize={8.5}
-            fill="currentColor"
-            fillOpacity={0.75}
-          >
-            {formatShortDate(hours[dayBoundaryIndex].date)}〜
+          <text x={primaryCoords[dayBoundaryIndex].x} y={PAD_TOP - 6} textAnchor="middle" fontSize={8.5} fill="currentColor" fillOpacity={0.75}>
+            {formatShortDate(primaryHours[dayBoundaryIndex].date)}〜
           </text>
         </>
       )}
 
-      {activeIndex !== null && coords[activeIndex] && (
+      {activeIndex !== null && primaryCoords[activeIndex] && (
         <line
-          x1={coords[activeIndex].x}
+          x1={primaryCoords[activeIndex].x}
           y1={PAD_TOP - 4}
-          x2={coords[activeIndex].x}
+          x2={primaryCoords[activeIndex].x}
           y2={CHART_HEIGHT - PAD_BOTTOM}
           stroke={color}
           strokeOpacity={0.3}
           strokeWidth={1.5}
         />
       )}
-      <path d={path} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      {coords.map((c, i) => {
+
+      {/* 目的地(2本目)の線: 破線 + やや薄めで、府中市の実線と区別する */}
+      {secondaryByKey &&
+        secondarySegments.map((seg, i) => (
+          <path
+            key={i}
+            d={buildSmoothPath(seg)}
+            fill="none"
+            stroke={color}
+            strokeOpacity={0.65}
+            strokeWidth={2}
+            strokeDasharray="5 4"
+            strokeLinecap="round"
+          />
+        ))}
+      {secondaryByKey &&
+        secondaryCoords.map((c, i) => {
+          if (!c) return null;
+          if (i !== activeIndex && i % stride !== 0 && i !== n - 1 && i !== dayBoundaryIndex) return null;
+          const size = i === activeIndex ? 4.5 : 3;
+          return (
+            <rect
+              key={i}
+              x={c.x - size}
+              y={c.y - size}
+              width={size * 2}
+              height={size * 2}
+              fill="#ffffff"
+              fillOpacity={0.9}
+              stroke={color}
+              strokeWidth={2}
+            />
+          );
+        })}
+
+      {/* 府中市(1本目)の線: 実線 */}
+      <path d={primaryPath} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      {primaryCoords.map((c, i) => {
         if (i !== activeIndex && i % stride !== 0 && i !== n - 1 && i !== dayBoundaryIndex) return null;
         return (
           <circle
@@ -218,68 +268,93 @@ function MetricChart({
   );
 }
 
-export default function HourlyForecast({ title, hours }: { title: string; hours: HourForecast[] }) {
+export default function HourlyForecast({
+  primary,
+  secondary,
+}: {
+  primary: LocationSeries;
+  secondary?: LocationSeries | null;
+}) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
-  if (hours.length === 0) {
+  if (primary.hours.length === 0) {
     return (
       <div className={styles.hourlyBlock}>
-        <div className={styles.locationLabel}>{title}の時間ごとの予報</div>
+        <div className={styles.locationLabel}>時間ごとの予報</div>
         <div className={styles.message}>この日の時間ごとのデータがありません。</div>
       </div>
     );
   }
 
-  const active = activeIndex !== null ? hours[activeIndex] : null;
-  const dayBoundaryIndex = findDayBoundaryIndex(hours);
-  const stride = labelStride(hours.length);
+  const secondaryByKey = secondary ? new Map(secondary.hours.map((h) => [hourKey(h), h])) : null;
+  const active = activeIndex !== null ? primary.hours[activeIndex] : null;
+  const activeSecondary = active && secondaryByKey ? secondaryByKey.get(hourKey(active)) ?? null : null;
+  const dayBoundaryIndex = findDayBoundaryIndex(primary.hours);
+  const stride = labelStride(primary.hours.length);
 
   return (
     <div className={styles.hourlyBlock}>
-      <div className={styles.locationLabel}>{title}の時間ごとの予報</div>
+      <div className={styles.hourlyHeaderRow}>
+        <div className={styles.locationLabel}>時間ごとの天気予報</div>
+        {secondary && (
+          <div className={styles.hourlyLegend}>
+            <span className={styles.legendItem}>
+              <span className={styles.legendLineSolid} /> {primary.label}
+            </span>
+            <span className={styles.legendItem}>
+              <span className={styles.legendLineDashed} /> {secondary.label}
+            </span>
+          </div>
+        )}
+      </div>
 
       <div className={styles.hourlyIconRow}>
-        {hours.map((h, i) => (
-          <div key={h.date + h.time} className={styles.hourlyIconWrap}>
-            {i === dayBoundaryIndex && (
-              <span className={styles.hourlyDateBadge}>{formatShortDate(h.date)}</span>
-            )}
-            <button
-              type="button"
-              className={`${styles.hourlyIconItem} ${i === activeIndex ? styles.hourlyIconItemActive : ""}`}
-              onMouseEnter={() => setActiveIndex(i)}
-              onFocus={() => setActiveIndex(i)}
-              onClick={() => setActiveIndex(i)}
-            >
-              <span className={styles.hourlyIconTime}>{h.hourLabel}</span>
-              <span role="img" aria-label={h.categoryLabel} className={styles.hourlyIconEmoji}>
-                {CATEGORY_EMOJI[h.category]}
-              </span>
-            </button>
-          </div>
-        ))}
+        {primary.hours.map((h, i) => {
+          const match = secondaryByKey?.get(hourKey(h));
+          return (
+            <div key={hourKey(h)} className={styles.hourlyIconWrap}>
+              {i === dayBoundaryIndex && <span className={styles.hourlyDateBadge}>{formatShortDate(h.date)}</span>}
+              <button
+                type="button"
+                className={`${styles.hourlyIconItem} ${i === activeIndex ? styles.hourlyIconItemActive : ""}`}
+                onMouseEnter={() => setActiveIndex(i)}
+                onFocus={() => setActiveIndex(i)}
+                onClick={() => setActiveIndex(i)}
+              >
+                <span className={styles.hourlyIconTime}>{h.hourLabel}</span>
+                <span role="img" aria-label={h.categoryLabel} className={styles.hourlyIconEmoji}>
+                  {CATEGORY_EMOJI[h.category]}
+                </span>
+                {match && (
+                  <span role="img" aria-label={match.categoryLabel} className={styles.hourlyIconEmojiSecondary}>
+                    {CATEGORY_EMOJI[match.category]}
+                  </span>
+                )}
+              </button>
+            </div>
+          );
+        })}
       </div>
 
       <div className={styles.hourlyTooltip}>
         {active ? (
-          <>
+          <div className={styles.hourlyTooltipStack}>
             <strong>
               {formatShortDate(active.date)} {active.time}
             </strong>
-            <span className={styles.hourlyTooltipItem}>
-              <i className={styles.hourlyDot} style={{ background: METRICS[0].color }} />
-              気温 {active.temp}°C
+            <span className={styles.hourlyTooltipRow}>
+              <span className={styles.hourlyTooltipLocation}>{primary.label}</span>
+              気温 {active.temp}°C／湿度 {active.humidity}%／降水確率 {active.pop}%（{active.categoryLabel}）
             </span>
-            <span className={styles.hourlyTooltipItem}>
-              <i className={styles.hourlyDot} style={{ background: METRICS[1].color }} />
-              湿度 {active.humidity}%
-            </span>
-            <span className={styles.hourlyTooltipItem}>
-              <i className={styles.hourlyDot} style={{ background: METRICS[2].color }} />
-              降水確率 {active.pop}%
-            </span>
-            <span className={styles.hourlyTooltipItem}>{active.categoryLabel}</span>
-          </>
+            {secondary && (
+              <span className={styles.hourlyTooltipRow}>
+                <span className={styles.hourlyTooltipLocation}>{secondary.label}</span>
+                {activeSecondary
+                  ? `気温 ${activeSecondary.temp}°C／湿度 ${activeSecondary.humidity}%／降水確率 ${activeSecondary.pop}%（${activeSecondary.categoryLabel}）`
+                  : "この時間のデータがありません"}
+              </span>
+            )}
+          </div>
         ) : (
           "グラフやアイコンにカーソルを合わせる（またはタップする）と、その時間の詳細が表示されます"
         )}
@@ -292,7 +367,8 @@ export default function HourlyForecast({ title, hours }: { title: string; hours:
             {m.label}
           </div>
           <MetricChart
-            hours={hours}
+            primaryHours={primary.hours}
+            secondaryByKey={secondaryByKey}
             metricKey={m.key}
             color={m.color}
             fixedDomain={m.fixedDomain}
@@ -301,12 +377,12 @@ export default function HourlyForecast({ title, hours }: { title: string; hours:
             onActive={setActiveIndex}
           />
           <div className={styles.chartAxis}>
-            {hours.map((h, i) => (
+            {primary.hours.map((h, i) => (
               <span
-                key={h.date + h.time}
+                key={hourKey(h)}
                 className={i === activeIndex ? styles.chartAxisActive : ""}
                 style={
-                  i % stride !== 0 && i !== hours.length - 1 && i !== dayBoundaryIndex
+                  i % stride !== 0 && i !== primary.hours.length - 1 && i !== dayBoundaryIndex
                     ? { visibility: "hidden" }
                     : undefined
                 }
