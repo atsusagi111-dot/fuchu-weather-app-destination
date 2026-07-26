@@ -5,6 +5,19 @@ export type WeatherCategory =
   | "heavy-rain"
   | "thunderstorm";
 
+export type HourForecast = {
+  time: string; // "HH:00" (Asia/Tokyo)
+  hourLabel: string; // "6時" など、グラフの横軸表示用
+  temp: number;
+  humidity: number;
+  pop: number; // 0-100 (%)
+  weatherMain: string;
+  weatherDescription: string;
+  icon: string;
+  category: WeatherCategory;
+  categoryLabel: string; // 晴れ / 曇り / 小雨 / 大雨 / 雷雨
+};
+
 export type DayForecast = {
   date: string; // YYYY-MM-DD (Asia/Tokyo)
   weekday: string;
@@ -18,6 +31,7 @@ export type DayForecast = {
   icon: string;
   category: WeatherCategory;
   categoryLabel: string; // 晴れ / 曇り / 小雨 / 大雨 / 雷雨
+  hours: HourForecast[]; // その日の3時間ごとの予報（時間ごとのグラフ用）
 };
 
 export type WeatherApiResponse = {

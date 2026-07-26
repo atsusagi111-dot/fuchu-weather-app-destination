@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import styles from "./weather.module.css";
 import type { DayForecast, WeatherApiResponse, WeatherCategory } from "@/app/lib/types";
+import { CATEGORY_EMOJI, CATEGORY_RAINDROPS } from "@/app/lib/ui";
+import HourlyForecast from "@/app/components/HourlyForecast";
 
 const CATEGORY_BG: Record<WeatherCategory, string> = {
   clear: "bgClear",
@@ -10,20 +12,6 @@ const CATEGORY_BG: Record<WeatherCategory, string> = {
   "light-rain": "bgLightRain",
   "heavy-rain": "bgHeavyRain",
   thunderstorm: "bgThunderstorm",
-};
-
-const CATEGORY_EMOJI: Record<WeatherCategory, string> = {
-  clear: "🌤️",
-  cloudy: "🌥️",
-  "light-rain": "☔",
-  "heavy-rain": "☔",
-  thunderstorm: "⚡☔",
-};
-
-const CATEGORY_RAINDROPS: Partial<Record<WeatherCategory, string>> = {
-  "light-rain": "💧",
-  "heavy-rain": "💧💧💧",
-  thunderstorm: "💧💧💧",
 };
 
 function backgroundClassFor(category: WeatherCategory): string {
@@ -347,6 +335,14 @@ export default function Home() {
                     </div>
                   </div>
                 </section>
+              )}
+            </section>
+
+            <section className={styles.hourlySection}>
+              <h2 className={styles.sectionTitle}>時間ごとの天気予報</h2>
+              {selectedDay && <HourlyForecast title="府中市" hours={selectedDay.hours} />}
+              {destinationSelectedDay && destinationData && (
+                <HourlyForecast title={destinationData.location} hours={destinationSelectedDay.hours} />
               )}
             </section>
 

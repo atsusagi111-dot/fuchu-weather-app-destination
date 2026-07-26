@@ -340,3 +340,128 @@
   font-size: 0.75rem;
   opacity: 0.75;
 }
+
+.hourlySection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.sectionTitle {
+  margin: 0;
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.hourlyBlock {
+  background: rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  padding: 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hourlyIconRow {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  justify-content: space-between;
+}
+
+.hourlyIconItem {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px;
+  border-radius: 10px;
+  font: inherit;
+  min-width: 40px;
+}
+
+.hourlyIconItem:hover,
+.hourlyIconItemActive {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.hourlyIconTime {
+  font-size: 0.7rem;
+  opacity: 0.85;
+}
+
+.hourlyIconEmoji {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.hourlyTooltip {
+  min-height: 1.4em;
+  font-size: 0.85rem;
+  text-align: center;
+  opacity: 0.9;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  justify-content: center;
+  align-items: center;
+}
+
+.hourlyTooltipItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.hourlyDot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.chartBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chartTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.chartSvg {
+  width: 100%;
+  height: auto;
+  display: block;
+  cursor: crosshair;
+  touch-action: pan-y;
+}
+
+.chartAxis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.65rem;
+  opacity: 0.7;
+  padding: 0 2px;
+}
+
+.chartAxisActive {
+  opacity: 1;
+  font-weight: 700;
+}

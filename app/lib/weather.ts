@@ -1,4 +1,9 @@
-import type { DayForecast, WeatherApiResponse, WeatherCategory } from "@/app/lib/types";
+import type {
+  DayForecast,
+  HourForecast,
+  WeatherApiResponse,
+  WeatherCategory,
+} from "@/app/lib/types";
 
 type OwmWeather = {
   id: number;
@@ -148,6 +153,27 @@ export async function fetchForecast(
       const weather = representative.weather[0];
       const category = classifyWeather(weather.id);
 
+      // 3時間ごとの生データも保持し、時間ごとの折れ線グラフに使う。
+      const hours: HourForecast[] = [...items]
+        .sort((a, b) => a.dt - b.dt)
+        .map((item) => {
+          const { hour } = toLocalParts(item.dt, tz);
+          const itemWeather = item.weather[0];
+          const itemCategory = classifyWeather(itemWeather.id);
+          return {
+            time: `${pad(hour)}:00`,
+            hourLabel: `${hour}時`,
+            temp: Math.round(item.main.temp),
+            humidity: item.main.humidity,
+            pop: Math.round(item.pop * 100),
+            weatherMain: itemWeather.main,
+            weatherDescription: itemWeather.description,
+            icon: itemWeather.icon,
+            category: itemCategory,
+            categoryLabel: CATEGORY_LABEL[itemCategory],
+          };
+        });
+
       return {
         date: dateKey,
         weekday: WEEKDAYS_JA[weekdayIndex],
@@ -161,6 +187,7 @@ export async function fetchForecast(
         icon: weather.icon,
         category,
         categoryLabel: CATEGORY_LABEL[category],
+        hours,
       };
     }
   );
