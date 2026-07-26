@@ -1,24 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import styles from "@/app/weather.module.css";
 import type { HourForecast } from "@/app/lib/types";
 import { CATEGORY_EMOJI } from "@/app/lib/ui";
 
 type MetricKey = "temp" | "humidity" | "pop";
 
-const METRICS: { key: MetricKey; label: string; color: string; unit: string; fixedDomain?: [number, number] }[] = [
+const METRICS: { key: MetricKey; label: string; color: string; unit: string }[] = [
   { key: "temp", label: "気温", color: "#e2622a", unit: "°C" },
-  { key: "humidity", label: "湿度", color: "#2f6fed", unit: "%", fixedDomain: [0, 100] },
-  { key: "pop", label: "降水確率", color: "#6c4fd6", unit: "%", fixedDomain: [0, 100] },
+  { key: "humidity", label: "湿度", color: "#2f6fed", unit: "%" },
+  { key: "pop", label: "降水確率", color: "#6c4fd6", unit: "%" },
 ];
 
 const CHART_WIDTH = 300;
-const CHART_HEIGHT = 116;
-const PAD_LEFT = 28;
+const CHART_HEIGHT = 170;
+const PAD_LEFT = 22;
 const PAD_RIGHT = 8;
-const PAD_TOP = 16;
-const PAD_BOTTOM = 18;
+const PAD_TOP = 18;
+const PAD_BOTTOM = 20;
 
 export type LocationSeries = {
   label: string;
@@ -82,192 +82,6 @@ function buildSegments(coords: ({ x: number; y: number } | null)[]): { x: number
   return segments;
 }
 
-function MetricChart({
-  primaryHours,
-  secondaryByKey,
-  metricKey,
-  color,
-  fixedDomain,
-  dayBoundaryIndex,
-  activeIndex,
-  onActive,
-}: {
-  primaryHours: HourForecast[];
-  secondaryByKey: Map<string, HourForecast> | null;
-  metricKey: MetricKey;
-  color: string;
-  fixedDomain?: [number, number];
-  dayBoundaryIndex: number;
-  activeIndex: number | null;
-  onActive: (index: number | null) => void;
-}) {
-  const n = primaryHours.length;
-  if (n === 0) return null;
-
-  const primaryValues = primaryHours.map((h) => h[metricKey]);
-  const secondaryValues: (number | null)[] = primaryHours.map((h) => {
-    const match = secondaryByKey?.get(hourKey(h));
-    return match ? match[metricKey] : null;
-  });
-
-  const allValues = [...primaryValues, ...secondaryValues.filter((v): v is number => v !== null)];
-  const [rawMin, rawMax] = fixedDomain ?? [Math.min(...allValues), Math.max(...allValues)];
-  const span = rawMax - rawMin || 1;
-  const min = fixedDomain ? rawMin : rawMin - span * 0.15;
-  const max = fixedDomain ? rawMax : rawMax + span * 0.15;
-  const range = max - min || 1;
-
-  const xFor = (i: number) =>
-    n === 1 ? CHART_WIDTH / 2 : PAD_LEFT + (i * (CHART_WIDTH - PAD_LEFT - PAD_RIGHT)) / (n - 1);
-  const yFor = (v: number) => CHART_HEIGHT - PAD_BOTTOM - ((v - min) / range) * (CHART_HEIGHT - PAD_TOP - PAD_BOTTOM);
-
-  const primaryCoords = primaryValues.map((v, i) => ({ x: xFor(i), y: yFor(v) }));
-  const primaryPath = buildSmoothPath(primaryCoords);
-
-  const secondaryCoords: ({ x: number; y: number } | null)[] = secondaryValues.map((v, i) =>
-    v === null ? null : { x: xFor(i), y: yFor(v) }
-  );
-  const secondarySegments = buildSegments(secondaryCoords);
-
-  const midValue = fixedDomain ? (fixedDomain[0] + fixedDomain[1]) / 2 : (rawMin + rawMax) / 2;
-  const yTicks = Array.from(new Set([rawMin, midValue, rawMax].map((v) => Math.round(v))));
-
-  const stride = labelStride(n);
-
-  function handlePointer(clientX: number, rect: DOMRect) {
-    const relX = ((clientX - rect.left) / rect.width) * CHART_WIDTH;
-    let nearest = 0;
-    let bestDiff = Infinity;
-    primaryCoords.forEach((c, i) => {
-      const diff = Math.abs(c.x - relX);
-      if (diff < bestDiff) {
-        bestDiff = diff;
-        nearest = i;
-      }
-    });
-    onActive(nearest);
-  }
-
-  return (
-    <svg
-      viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-      className={styles.chartSvg}
-      role="img"
-      aria-label={`${metricKey}の時間ごとの推移`}
-      onMouseMove={(e) => handlePointer(e.clientX, e.currentTarget.getBoundingClientRect())}
-      onMouseLeave={() => onActive(null)}
-      onClick={(e) => handlePointer(e.clientX, e.currentTarget.getBoundingClientRect())}
-    >
-      {/* Y軸の目盛り線とラベル */}
-      {yTicks.map((tick) => {
-        const y = yFor(tick);
-        return (
-          <g key={tick}>
-            <line
-              x1={PAD_LEFT}
-              y1={y}
-              x2={CHART_WIDTH - PAD_RIGHT}
-              y2={y}
-              stroke="currentColor"
-              strokeOpacity={0.15}
-              strokeWidth={1}
-            />
-            <text x={PAD_LEFT - 4} y={y} textAnchor="end" dominantBaseline="middle" fontSize={8.5} fill="currentColor" fillOpacity={0.7}>
-              {tick}
-            </text>
-          </g>
-        );
-      })}
-
-      {/* X軸・Y軸の軸線 */}
-      <line x1={PAD_LEFT} y1={PAD_TOP - 4} x2={PAD_LEFT} y2={CHART_HEIGHT - PAD_BOTTOM} stroke="currentColor" strokeOpacity={0.35} strokeWidth={1} />
-      <line x1={PAD_LEFT} y1={CHART_HEIGHT - PAD_BOTTOM} x2={CHART_WIDTH - PAD_RIGHT} y2={CHART_HEIGHT - PAD_BOTTOM} stroke="currentColor" strokeOpacity={0.35} strokeWidth={1} />
-
-      {/* 日付が変わる位置の目印 */}
-      {dayBoundaryIndex >= 0 && primaryCoords[dayBoundaryIndex] && (
-        <>
-          <line
-            x1={primaryCoords[dayBoundaryIndex].x}
-            y1={PAD_TOP - 4}
-            x2={primaryCoords[dayBoundaryIndex].x}
-            y2={CHART_HEIGHT - PAD_BOTTOM}
-            stroke="currentColor"
-            strokeOpacity={0.4}
-            strokeWidth={1}
-            strokeDasharray="3 3"
-          />
-          <text x={primaryCoords[dayBoundaryIndex].x} y={PAD_TOP - 6} textAnchor="middle" fontSize={8.5} fill="currentColor" fillOpacity={0.75}>
-            {formatShortDate(primaryHours[dayBoundaryIndex].date)}〜
-          </text>
-        </>
-      )}
-
-      {activeIndex !== null && primaryCoords[activeIndex] && (
-        <line
-          x1={primaryCoords[activeIndex].x}
-          y1={PAD_TOP - 4}
-          x2={primaryCoords[activeIndex].x}
-          y2={CHART_HEIGHT - PAD_BOTTOM}
-          stroke={color}
-          strokeOpacity={0.3}
-          strokeWidth={1.5}
-        />
-      )}
-
-      {/* 目的地(2本目)の線: 破線 + やや薄めで、府中市の実線と区別する */}
-      {secondaryByKey &&
-        secondarySegments.map((seg, i) => (
-          <path
-            key={i}
-            d={buildSmoothPath(seg)}
-            fill="none"
-            stroke={color}
-            strokeOpacity={0.65}
-            strokeWidth={2}
-            strokeDasharray="5 4"
-            strokeLinecap="round"
-          />
-        ))}
-      {secondaryByKey &&
-        secondaryCoords.map((c, i) => {
-          if (!c) return null;
-          if (i !== activeIndex && i % stride !== 0 && i !== n - 1 && i !== dayBoundaryIndex) return null;
-          const size = i === activeIndex ? 4.5 : 3;
-          return (
-            <rect
-              key={i}
-              x={c.x - size}
-              y={c.y - size}
-              width={size * 2}
-              height={size * 2}
-              fill="#ffffff"
-              fillOpacity={0.9}
-              stroke={color}
-              strokeWidth={2}
-            />
-          );
-        })}
-
-      {/* 府中市(1本目)の線: 実線 */}
-      <path d={primaryPath} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      {primaryCoords.map((c, i) => {
-        if (i !== activeIndex && i % stride !== 0 && i !== n - 1 && i !== dayBoundaryIndex) return null;
-        return (
-          <circle
-            key={i}
-            cx={c.x}
-            cy={c.y}
-            r={i === activeIndex ? 5 : 3}
-            fill={i === activeIndex ? color : "#ffffff"}
-            stroke={color}
-            strokeWidth={2}
-          />
-        );
-      })}
-    </svg>
-  );
-}
-
 export default function HourlyForecast({
   primary,
   secondary,
@@ -276,6 +90,11 @@ export default function HourlyForecast({
   secondary?: LocationSeries | null;
 }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
+  const secondaryByKey = useMemo(
+    () => (secondary ? new Map(secondary.hours.map((h) => [hourKey(h), h])) : null),
+    [secondary]
+  );
 
   if (primary.hours.length === 0) {
     return (
@@ -286,16 +105,67 @@ export default function HourlyForecast({
     );
   }
 
-  const secondaryByKey = secondary ? new Map(secondary.hours.map((h) => [hourKey(h), h])) : null;
+  const n = primary.hours.length;
+  const dayBoundaryIndex = findDayBoundaryIndex(primary.hours);
+  const stride = labelStride(n);
+
+  // 気温は℃、湿度・降水確率は%と単位が異なるため、1つのグラフに重ねるにあたって
+  // 気温だけ「この期間の中での相対位置」に正規化してスケールを揃える。
+  // 実際の数値はツールチップ・アイコン行で必ず確認できるようにする。
+  const tempValues = [
+    ...primary.hours.map((h) => h.temp),
+    ...(secondary?.hours.map((h) => h.temp) ?? []),
+  ];
+  const tempRawMin = Math.min(...tempValues);
+  const tempRawMax = Math.max(...tempValues);
+  const tempSpan = tempRawMax - tempRawMin || 1;
+  const tempMin = tempRawMin - tempSpan * 0.1;
+  const tempMax = tempRawMax + tempSpan * 0.1;
+
+  function normalize(key: MetricKey, value: number): number {
+    if (key === "temp") {
+      return ((value - tempMin) / (tempMax - tempMin || 1)) * 100;
+    }
+    return value; // 湿度・降水確率はもともと 0-100
+  }
+
+  const xFor = (i: number) =>
+    n === 1 ? CHART_WIDTH / 2 : PAD_LEFT + (i * (CHART_WIDTH - PAD_LEFT - PAD_RIGHT)) / (n - 1);
+  const yFor = (normValue: number) =>
+    CHART_HEIGHT - PAD_BOTTOM - (normValue / 100) * (CHART_HEIGHT - PAD_TOP - PAD_BOTTOM);
+
+  function handlePointer(clientX: number, rect: DOMRect) {
+    const relX = ((clientX - rect.left) / rect.width) * CHART_WIDTH;
+    let nearest = 0;
+    let bestDiff = Infinity;
+    for (let i = 0; i < n; i++) {
+      const diff = Math.abs(xFor(i) - relX);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        nearest = i;
+      }
+    }
+    setActiveIndex(nearest);
+  }
+
   const active = activeIndex !== null ? primary.hours[activeIndex] : null;
   const activeSecondary = active && secondaryByKey ? secondaryByKey.get(hourKey(active)) ?? null : null;
-  const dayBoundaryIndex = findDayBoundaryIndex(primary.hours);
-  const stride = labelStride(primary.hours.length);
 
   return (
     <div className={styles.hourlyBlock}>
       <div className={styles.hourlyHeaderRow}>
         <div className={styles.locationLabel}>時間ごとの天気予報</div>
+      </div>
+
+      <div className={styles.hourlyLegendGroup}>
+        <div className={styles.hourlyLegend}>
+          {METRICS.map((m) => (
+            <span key={m.key} className={styles.legendItem}>
+              <i className={styles.hourlyDot} style={{ background: m.color }} />
+              {m.label}
+            </span>
+          ))}
+        </div>
         {secondary && (
           <div className={styles.hourlyLegend}>
             <span className={styles.legendItem}>
@@ -360,39 +230,151 @@ export default function HourlyForecast({
         )}
       </div>
 
-      {METRICS.map((m) => (
-        <div key={m.key} className={styles.chartBlock}>
-          <div className={styles.chartTitle}>
-            <i className={styles.hourlyDot} style={{ background: m.color }} />
-            {m.label}
-          </div>
-          <MetricChart
-            primaryHours={primary.hours}
-            secondaryByKey={secondaryByKey}
-            metricKey={m.key}
-            color={m.color}
-            fixedDomain={m.fixedDomain}
-            dayBoundaryIndex={dayBoundaryIndex}
-            activeIndex={activeIndex}
-            onActive={setActiveIndex}
+      <svg
+        viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+        className={styles.chartSvg}
+        role="img"
+        aria-label="気温・湿度・降水確率の時間ごとの推移"
+        onMouseMove={(e) => handlePointer(e.clientX, e.currentTarget.getBoundingClientRect())}
+        onMouseLeave={() => setActiveIndex(null)}
+        onClick={(e) => handlePointer(e.clientX, e.currentTarget.getBoundingClientRect())}
+      >
+        {/* 目安となる横のグリッド線 (0/50/100 の相対位置) */}
+        {[0, 50, 100].map((tick) => {
+          const y = yFor(tick);
+          return (
+            <line
+              key={tick}
+              x1={PAD_LEFT}
+              y1={y}
+              x2={CHART_WIDTH - PAD_RIGHT}
+              y2={y}
+              stroke="currentColor"
+              strokeOpacity={0.15}
+              strokeWidth={1}
+            />
+          );
+        })}
+
+        {/* X軸・Y軸の軸線 */}
+        <line x1={PAD_LEFT} y1={PAD_TOP - 4} x2={PAD_LEFT} y2={CHART_HEIGHT - PAD_BOTTOM} stroke="currentColor" strokeOpacity={0.35} strokeWidth={1} />
+        <line x1={PAD_LEFT} y1={CHART_HEIGHT - PAD_BOTTOM} x2={CHART_WIDTH - PAD_RIGHT} y2={CHART_HEIGHT - PAD_BOTTOM} stroke="currentColor" strokeOpacity={0.35} strokeWidth={1} />
+        <text x={PAD_LEFT - 4} y={yFor(100)} textAnchor="end" dominantBaseline="middle" fontSize={7.5} fill="currentColor" fillOpacity={0.6}>高</text>
+        <text x={PAD_LEFT - 4} y={yFor(0)} textAnchor="end" dominantBaseline="middle" fontSize={7.5} fill="currentColor" fillOpacity={0.6}>低</text>
+
+        {/* 日付が変わる位置の目印 */}
+        {dayBoundaryIndex >= 0 && (
+          <>
+            <line
+              x1={xFor(dayBoundaryIndex)}
+              y1={PAD_TOP - 4}
+              x2={xFor(dayBoundaryIndex)}
+              y2={CHART_HEIGHT - PAD_BOTTOM}
+              stroke="currentColor"
+              strokeOpacity={0.4}
+              strokeWidth={1}
+              strokeDasharray="3 3"
+            />
+            <text x={xFor(dayBoundaryIndex)} y={PAD_TOP - 6} textAnchor="middle" fontSize={8.5} fill="currentColor" fillOpacity={0.75}>
+              {formatShortDate(primary.hours[dayBoundaryIndex].date)}〜
+            </text>
+          </>
+        )}
+
+        {activeIndex !== null && (
+          <line
+            x1={xFor(activeIndex)}
+            y1={PAD_TOP - 4}
+            x2={xFor(activeIndex)}
+            y2={CHART_HEIGHT - PAD_BOTTOM}
+            stroke="currentColor"
+            strokeOpacity={0.3}
+            strokeWidth={1.5}
           />
-          <div className={styles.chartAxis}>
-            {primary.hours.map((h, i) => (
-              <span
-                key={hourKey(h)}
-                className={i === activeIndex ? styles.chartAxisActive : ""}
-                style={
-                  i % stride !== 0 && i !== primary.hours.length - 1 && i !== dayBoundaryIndex
-                    ? { visibility: "hidden" }
-                    : undefined
-                }
-              >
-                {i === dayBoundaryIndex ? `${formatShortDate(h.date)} ${h.hourLabel}` : h.hourLabel}
-              </span>
-            ))}
-          </div>
-        </div>
-      ))}
+        )}
+
+        {METRICS.map((m) => {
+          const primaryCoords = primary.hours.map((h, i) => ({ x: xFor(i), y: yFor(normalize(m.key, h[m.key])) }));
+          const primaryPath = buildSmoothPath(primaryCoords);
+
+          const secondaryCoords: ({ x: number; y: number } | null)[] = primary.hours.map((h, i) => {
+            const match = secondaryByKey?.get(hourKey(h));
+            return match ? { x: xFor(i), y: yFor(normalize(m.key, match[m.key])) } : null;
+          });
+          const secondarySegments = secondaryByKey ? buildSegments(secondaryCoords) : [];
+
+          return (
+            <g key={m.key}>
+              {secondarySegments.map((seg, i) => (
+                <path
+                  key={i}
+                  d={buildSmoothPath(seg)}
+                  fill="none"
+                  stroke={m.color}
+                  strokeOpacity={0.6}
+                  strokeWidth={2}
+                  strokeDasharray="5 4"
+                  strokeLinecap="round"
+                />
+              ))}
+              {secondaryCoords.map((c, i) => {
+                if (!c) return null;
+                if (i !== activeIndex && i % stride !== 0 && i !== n - 1 && i !== dayBoundaryIndex) return null;
+                const size = i === activeIndex ? 4 : 2.5;
+                return (
+                  <rect
+                    key={i}
+                    x={c.x - size}
+                    y={c.y - size}
+                    width={size * 2}
+                    height={size * 2}
+                    fill="#ffffff"
+                    fillOpacity={0.9}
+                    stroke={m.color}
+                    strokeWidth={1.5}
+                  />
+                );
+              })}
+
+              <path d={primaryPath} fill="none" stroke={m.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              {primaryCoords.map((c, i) => {
+                if (i !== activeIndex && i % stride !== 0 && i !== n - 1 && i !== dayBoundaryIndex) return null;
+                return (
+                  <circle
+                    key={i}
+                    cx={c.x}
+                    cy={c.y}
+                    r={i === activeIndex ? 4.5 : 2.5}
+                    fill={i === activeIndex ? m.color : "#ffffff"}
+                    stroke={m.color}
+                    strokeWidth={1.5}
+                  />
+                );
+              })}
+            </g>
+          );
+        })}
+      </svg>
+
+      <div className={styles.chartAxis}>
+        {primary.hours.map((h, i) => (
+          <span
+            key={hourKey(h)}
+            className={i === activeIndex ? styles.chartAxisActive : ""}
+            style={
+              i % stride !== 0 && i !== primary.hours.length - 1 && i !== dayBoundaryIndex
+                ? { visibility: "hidden" }
+                : undefined
+            }
+          >
+            {i === dayBoundaryIndex ? `${formatShortDate(h.date)} ${h.hourLabel}` : h.hourLabel}
+          </span>
+        ))}
+      </div>
+
+      <p className={styles.hourlyAxisNote}>
+        ※ 縦軸は期間内の相対的な高さの目安です（気温・湿度・降水確率の実際の数値は、カーソルを合わせると確認できます）
+      </p>
     </div>
   );
 }

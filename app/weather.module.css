@@ -367,10 +367,17 @@
   gap: 6px;
 }
 
+.hourlyLegendGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .hourlyLegend {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  justify-content: center;
 }
 
 .legendItem {
@@ -487,19 +494,12 @@
   flex-shrink: 0;
 }
 
-.chartBlock {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.chartTitle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  opacity: 0.85;
+.hourlyAxisNote {
+  margin: 0;
+  font-size: 0.68rem;
+  opacity: 0.65;
+  text-align: center;
+  line-height: 1.4;
 }
 
 .chartSvg {
