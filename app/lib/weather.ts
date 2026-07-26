@@ -72,7 +72,63 @@ function toLocalParts(unixSeconds: number, tzOffsetSeconds: number) {
     month: shifted.getUTCMonth() + 1,
     day: shifted.getUTCDate(),
     hour: shifted.getUTCHours(),
+    minute: shifted.getUTCMinutes(),
     weekdayIndex: shifted.getUTCDay(),
+  };
+}
+
+type OwmCurrentResponse = {
+  dt: number;
+  timezone: number;
+  main: { temp: number; humidity: number };
+  weather: OwmWeather[];
+};
+
+// OpenWeatherMapの実況(Current Weather)APIを使って「今」の気温・湿度・天気を取得する。
+// forecast APIは未来のスロットしか返さないため、これが無いと当日の現在時刻の天候を
+// グラフ上で確認できない。取得できない場合はnullを返し、呼び出し側は既存の予報表示を
+// そのまま続ける(グラフから「現在」の点が抜けるだけで、他の機能は壊さない)。
+async function fetchCurrentConditions(
+  lat: number,
+  lon: number,
+  apiKey: string
+): Promise<(HourForecast & { weekdayIndex: number }) | null> {
+  const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&lang=ja&appid=${apiKey}`;
+
+  let res: Response;
+  try {
+    res = await fetch(url, { next: { revalidate: 300 } });
+  } catch {
+    return null;
+  }
+  if (!res.ok) return null;
+
+  let data: OwmCurrentResponse;
+  try {
+    data = (await res.json()) as OwmCurrentResponse;
+  } catch {
+    return null;
+  }
+
+  const weather = data.weather?.[0];
+  if (!weather) return null;
+
+  const { year, month, day, hour, minute, weekdayIndex } = toLocalParts(data.dt, data.timezone);
+  const category = classifyWeather(weather.id);
+
+  return {
+    date: `${year}-${pad(month)}-${pad(day)}`,
+    time: `${pad(hour)}:${pad(minute)}`,
+    hourLabel: "現在",
+    temp: Math.round(data.main.temp),
+    humidity: data.main.humidity,
+    pop: 0, // 実況APIには降水確率が無いため、呼び出し側で直近の予報値に差し替える
+    weatherMain: weather.main,
+    weatherDescription: weather.description,
+    icon: weather.icon,
+    category,
+    categoryLabel: CATEGORY_LABEL[category],
+    weekdayIndex,
   };
 }
 
@@ -192,6 +248,38 @@ export async function fetchForecast(
       };
     }
   );
+
+  // 現在時刻の実況を取得できたら、当日の予報の先頭に「現在」として差し込む。
+  const current = await fetchCurrentConditions(lat, lon, apiKey);
+  if (current) {
+    const fallbackPop = data.list[0] ? Math.round(data.list[0].pop * 100) : 0;
+    const { weekdayIndex, ...nowHour } = { ...current, pop: fallbackPop };
+
+    const todayIndex = days.findIndex((d) => d.date === current.date);
+    if (todayIndex >= 0) {
+      days[todayIndex] = {
+        ...days[todayIndex],
+        hours: [nowHour, ...days[todayIndex].hours],
+      };
+    } else {
+      // 深夜など、当日の予報スロットが1つも残っていない場合は「現在」だけの日を先頭に追加する。
+      days.unshift({
+        date: current.date,
+        weekday: WEEKDAYS_JA[weekdayIndex],
+        temp: nowHour.temp,
+        tempMin: nowHour.temp,
+        tempMax: nowHour.temp,
+        humidity: nowHour.humidity,
+        pop: fallbackPop,
+        weatherMain: nowHour.weatherMain,
+        weatherDescription: nowHour.weatherDescription,
+        icon: nowHour.icon,
+        category: nowHour.category,
+        categoryLabel: nowHour.categoryLabel,
+        hours: [nowHour],
+      });
+    }
+  }
 
   const payload: WeatherApiResponse = {
     location,
