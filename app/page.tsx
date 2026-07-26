@@ -211,9 +211,7 @@ export default function Home() {
         <header className={styles.header}>
           <h1 className={styles.title}>🚲 自転車お出かけ天気</h1>
           <p className={styles.tagline}>自転車で行ける？帰りは大丈夫？天気から最適な移動を提案。</p>
-          <p className={styles.subtitle}>
-            {data?.location ?? "東京都府中市"} の天気予報 ／ 日付を選んで、その日の予報を確認できます
-          </p>
+          <p className={styles.subtitle}>日付を選んで、その日の天気予報を確認できます</p>
         </header>
 
         {loading && <div className={styles.message}>読み込み中...</div>}
@@ -284,7 +282,7 @@ export default function Home() {
               </form>
 
               <p className={styles.adviceHint}>
-                🚲 出発時間と帰宅時間を入力すると、上のカレンダーで選んでいる日付（{selectedDay ? formatDateLabel(selectedDay) : "未選択"}）を対象に、自転車で行くべきかのアドバイスが表示されます。目的地は入力しなくても大丈夫です（未入力の場合は府中市の天気で判断します）。
+                🚲 出発時間と帰宅時間を入力すると、上のカレンダーで選んでいる日付（{selectedDay ? formatDateLabel(selectedDay) : "未選択"}）を対象に、自転車で行くべきかのアドバイスが表示されます。目的地は入力しなくても大丈夫です（未入力の場合は現在地の天気で判断）。
               </p>
 
               <div className={styles.timeRow}>
@@ -358,7 +356,7 @@ export default function Home() {
 
             {selectedDay && (
               <section className={styles.card}>
-                <div className={styles.locationLabel}>現在地（府中市）</div>
+                <div className={styles.locationLabel}>府中市</div>
                 <div className={styles.cardDate}>{formatDateLabel(selectedDay)}</div>
                 <div
                   className={styles.cardIcon}
