@@ -209,8 +209,11 @@ export default function Home() {
       )}
       <div className={styles.container}>
         <header className={styles.header}>
-          <h1 className={styles.title}>{data?.location ?? "東京都府中市"} の天気予報</h1>
-          <p className={styles.subtitle}>日付を選んで、その日の予報を確認できます</p>
+          <h1 className={styles.title}>🚲 自転車お出かけ天気</h1>
+          <p className={styles.tagline}>自転車で行ける？帰りは大丈夫？天気から最適な移動を提案。</p>
+          <p className={styles.subtitle}>
+            {data?.location ?? "東京都府中市"} の天気予報 ／ 日付を選んで、その日の予報を確認できます
+          </p>
         </header>
 
         {loading && <div className={styles.message}>読み込み中...</div>}

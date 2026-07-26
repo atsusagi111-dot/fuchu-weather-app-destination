@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "府中市 天気予報",
-  description: "東京都府中市の気温・天気・湿度・降水確率を日付ごとに確認できる天気予報アプリ",
+  title: "自転車お出かけ天気 | 出発・帰宅時間から自転車で行けるか判断",
+  description:
+    "自転車で行ける？帰りは大丈夫？天気から最適な移動を提案。出発時間と帰宅時間をもとに、東京都府中市と目的地の気温・天気・湿度・降水確率から自転車移動の可否をアドバイスするアプリ。",
 };
 
 export default function RootLayout({
