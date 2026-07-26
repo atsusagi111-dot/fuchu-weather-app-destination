@@ -282,7 +282,7 @@ export default function Home() {
               </form>
 
               <p className={styles.adviceHint}>
-                🚲 出発時間と帰宅時間を入力すると、上のカレンダーで選んでいる日付（{selectedDay ? formatDateLabel(selectedDay) : "未選択"}）を対象に、自転車で行くべきかのアドバイスが表示されます。目的地は入力しなくても大丈夫です（未入力の場合は現在地の天気で判断）。
+                🚲 出発時間と帰宅時間を入力すると、上のカレンダーで選んでいる日付（{selectedDay ? formatDateLabel(selectedDay) : "未選択"}）を対象に、自転車で行くべきかのアドバイスが表示されます。目的地は入力しなくても大丈夫です（未入力の場合は府中市で判断）。
               </p>
 
               <div className={styles.timeRow}>
