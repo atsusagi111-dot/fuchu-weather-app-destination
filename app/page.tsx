@@ -366,6 +366,14 @@ export default function Home() {
               )}
             </section>
 
+            {destinationSelectedDay && destinationData && (
+              <section className={styles.hourlySection}>
+                <HourlyForecast
+                  primary={{ label: destinationData.location, hours: destinationHourlyWindow }}
+                />
+              </section>
+            )}
+
             {selectedDay && (
               <section className={styles.card}>
                 <div className={styles.locationLabel}>府中市</div>
@@ -402,14 +410,7 @@ export default function Home() {
             )}
 
             <section className={styles.hourlySection}>
-              <HourlyForecast
-                primary={{ label: "府中市", hours: fuchuHourlyWindow }}
-                secondary={
-                  destinationSelectedDay && destinationData
-                    ? { label: destinationData.location, hours: destinationHourlyWindow }
-                    : null
-                }
-              />
+              <HourlyForecast primary={{ label: "府中市", hours: fuchuHourlyWindow }} />
             </section>
 
             <p className={styles.footer}>

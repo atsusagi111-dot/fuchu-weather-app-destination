@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import styles from "@/app/weather.module.css";
 import type { HourForecast } from "@/app/lib/types";
 import { CATEGORY_EMOJI } from "@/app/lib/ui";
@@ -66,22 +66,6 @@ function buildSmoothPath(coords: { x: number; y: number }[]): string {
   return d;
 }
 
-// null (対応データなし)で分断された点列を、連続する区間ごとに分けてパスを作る。
-function buildSegments(coords: ({ x: number; y: number } | null)[]): { x: number; y: number }[][] {
-  const segments: { x: number; y: number }[][] = [];
-  let current: { x: number; y: number }[] = [];
-  for (const c of coords) {
-    if (c) {
-      current.push(c);
-    } else if (current.length) {
-      segments.push(current);
-      current = [];
-    }
-  }
-  if (current.length) segments.push(current);
-  return segments;
-}
-
 // ホバー中の値ラベルが縦に重ならないよう、最小間隔をあけつつ
 // 元のグラフ上の高さ範囲に収まるようYを調整する。
 function declutterY(ys: number[], minGap: number, minY: number, maxY: number): number[] {
@@ -109,24 +93,13 @@ function declutterY(ys: number[], minGap: number, minY: number, maxY: number): n
   return adjusted;
 }
 
-export default function HourlyForecast({
-  primary,
-  secondary,
-}: {
-  primary: LocationSeries;
-  secondary?: LocationSeries | null;
-}) {
+export default function HourlyForecast({ primary }: { primary: LocationSeries }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
-
-  const secondaryByKey = useMemo(
-    () => (secondary ? new Map(secondary.hours.map((h) => [hourKey(h), h])) : null),
-    [secondary]
-  );
 
   if (primary.hours.length === 0) {
     return (
       <div className={styles.hourlyBlock}>
-        <div className={styles.locationLabel}>時間ごとの予報</div>
+        <div className={styles.locationLabel}>{primary.label}の時間ごとの予報</div>
         <div className={styles.message}>この日の時間ごとのデータがありません。</div>
       </div>
     );
@@ -139,10 +112,7 @@ export default function HourlyForecast({
   // 気温は℃、湿度・降水確率は%と単位が異なるため、1つのグラフに重ねるにあたって
   // 気温だけ「この期間の中での相対位置」に正規化してスケールを揃える。
   // 実際の数値はツールチップ・アイコン行で必ず確認できるようにする。
-  const tempValues = [
-    ...primary.hours.map((h) => h.temp),
-    ...(secondary?.hours.map((h) => h.temp) ?? []),
-  ];
+  const tempValues = primary.hours.map((h) => h.temp);
   const tempRawMin = Math.min(...tempValues);
   const tempRawMax = Math.max(...tempValues);
   const tempSpan = tempRawMax - tempRawMin || 1;
@@ -176,49 +146,30 @@ export default function HourlyForecast({
   }
 
   const active = activeIndex !== null ? primary.hours[activeIndex] : null;
-  const activeSecondary = active && secondaryByKey ? secondaryByKey.get(hourKey(active)) ?? null : null;
 
   // 各指標(気温・湿度・降水確率)の線の座標をまとめて計算しておき、
   // 描画とホバー時のラベル配置の両方で使い回す。
   const seriesData = METRICS.map((m) => {
     const primaryCoords = primary.hours.map((h, i) => ({ x: xFor(i), y: yFor(normalize(m.key, h[m.key])) }));
-    const secondaryCoords: ({ x: number; y: number } | null)[] = primary.hours.map((h, i) => {
-      const match = secondaryByKey?.get(hourKey(h));
-      return match ? { x: xFor(i), y: yFor(normalize(m.key, match[m.key])) } : null;
-    });
-    return { ...m, primaryCoords, secondaryCoords };
+    return { ...m, primaryCoords };
   });
 
   const lineOpacity = activeIndex !== null ? 0.25 : 1;
-  const dashedLineOpacity = activeIndex !== null ? 0.25 : 0.6;
 
   // ホバー中の点の近くに表示する「気温35°C」のような小さな数値ラベル。
   const labelItems =
     activeIndex !== null
       ? seriesData.flatMap((s) => {
-          const items: { key: string; y: number; text: string; color: string; italic: boolean }[] = [];
           const pc = s.primaryCoords[activeIndex];
-          if (pc) {
-            items.push({
-              key: `${s.key}-p`,
+          if (!pc) return [];
+          return [
+            {
+              key: s.key,
               y: pc.y,
               text: `${s.label} ${primary.hours[activeIndex][s.key]}${s.unit}`,
               color: s.color,
-              italic: false,
-            });
-          }
-          const sc = s.secondaryCoords[activeIndex];
-          const matchHour = secondaryByKey?.get(hourKey(primary.hours[activeIndex]));
-          if (sc && matchHour) {
-            items.push({
-              key: `${s.key}-s`,
-              y: sc.y,
-              text: `${s.label} ${matchHour[s.key]}${s.unit}`,
-              color: s.color,
-              italic: true,
-            });
-          }
-          return items;
+            },
+          ];
         })
       : [];
 
@@ -234,56 +185,36 @@ export default function HourlyForecast({
   return (
     <div className={styles.hourlyBlock}>
       <div className={styles.hourlyHeaderRow}>
-        <div className={styles.locationLabel}>時間ごとの天気予報</div>
+        <div className={styles.locationLabel}>{primary.label}の時間ごとの天気予報</div>
       </div>
 
-      <div className={styles.hourlyLegendGroup}>
-        <div className={styles.hourlyLegend}>
-          {METRICS.map((m) => (
-            <span key={m.key} className={styles.legendItem}>
-              <i className={styles.hourlyDot} style={{ background: m.color }} />
-              {m.label}
-            </span>
-          ))}
-        </div>
-        {secondary && (
-          <div className={styles.hourlyLegend}>
-            <span className={styles.legendItem}>
-              <span className={styles.legendLineSolid} /> {primary.label}
-            </span>
-            <span className={styles.legendItem}>
-              <span className={styles.legendLineDashed} /> {secondary.label}
-            </span>
-          </div>
-        )}
+      <div className={styles.hourlyLegend}>
+        {METRICS.map((m) => (
+          <span key={m.key} className={styles.legendItem}>
+            <i className={styles.hourlyDot} style={{ background: m.color }} />
+            {m.label}
+          </span>
+        ))}
       </div>
 
       <div className={styles.hourlyIconRow}>
-        {primary.hours.map((h, i) => {
-          const match = secondaryByKey?.get(hourKey(h));
-          return (
-            <div key={hourKey(h)} className={styles.hourlyIconWrap}>
-              {i === dayBoundaryIndex && <span className={styles.hourlyDateBadge}>{formatShortDate(h.date)}</span>}
-              <button
-                type="button"
-                className={`${styles.hourlyIconItem} ${i === activeIndex ? styles.hourlyIconItemActive : ""}`}
-                onMouseEnter={() => setActiveIndex(i)}
-                onFocus={() => setActiveIndex(i)}
-                onClick={() => setActiveIndex(i)}
-              >
-                <span className={styles.hourlyIconTime}>{h.hourLabel}</span>
-                <span role="img" aria-label={h.categoryLabel} className={styles.hourlyIconEmoji}>
-                  {CATEGORY_EMOJI[h.category]}
-                </span>
-                {match && (
-                  <span role="img" aria-label={match.categoryLabel} className={styles.hourlyIconEmojiSecondary}>
-                    {CATEGORY_EMOJI[match.category]}
-                  </span>
-                )}
-              </button>
-            </div>
-          );
-        })}
+        {primary.hours.map((h, i) => (
+          <div key={hourKey(h)} className={styles.hourlyIconWrap}>
+            {i === dayBoundaryIndex && <span className={styles.hourlyDateBadge}>{formatShortDate(h.date)}</span>}
+            <button
+              type="button"
+              className={`${styles.hourlyIconItem} ${i === activeIndex ? styles.hourlyIconItemActive : ""}`}
+              onMouseEnter={() => setActiveIndex(i)}
+              onFocus={() => setActiveIndex(i)}
+              onClick={() => setActiveIndex(i)}
+            >
+              <span className={styles.hourlyIconTime}>{h.hourLabel}</span>
+              <span role="img" aria-label={h.categoryLabel} className={styles.hourlyIconEmoji}>
+                {CATEGORY_EMOJI[h.category]}
+              </span>
+            </button>
+          </div>
+        ))}
       </div>
 
       <div className={styles.hourlyTooltip}>
@@ -293,17 +224,8 @@ export default function HourlyForecast({
               {formatShortDate(active.date)} {active.time}
             </strong>
             <span className={styles.hourlyTooltipRow}>
-              <span className={styles.hourlyTooltipLocation}>{primary.label}</span>
               気温 {active.temp}°C／湿度 {active.humidity}%／降水確率 {active.pop}%（{active.categoryLabel}）
             </span>
-            {secondary && (
-              <span className={styles.hourlyTooltipRow}>
-                <span className={styles.hourlyTooltipLocation}>{secondary.label}</span>
-                {activeSecondary
-                  ? `気温 ${activeSecondary.temp}°C／湿度 ${activeSecondary.humidity}%／降水確率 ${activeSecondary.pop}%（${activeSecondary.categoryLabel}）`
-                  : "この時間のデータがありません"}
-              </span>
-            )}
           </div>
         ) : (
           "グラフやアイコンにカーソルを合わせる（またはタップする）と、その時間の詳細が表示されます"
@@ -375,43 +297,9 @@ export default function HourlyForecast({
 
         {seriesData.map((s) => {
           const primaryPath = buildSmoothPath(s.primaryCoords);
-          const secondarySegments = secondaryByKey ? buildSegments(s.secondaryCoords) : [];
 
           return (
             <g key={s.key}>
-              {secondarySegments.map((seg, i) => (
-                <path
-                  key={i}
-                  d={buildSmoothPath(seg)}
-                  fill="none"
-                  stroke={s.color}
-                  strokeOpacity={dashedLineOpacity}
-                  strokeWidth={2}
-                  strokeDasharray="5 4"
-                  strokeLinecap="round"
-                />
-              ))}
-              {s.secondaryCoords.map((c, i) => {
-                if (!c) return null;
-                if (i !== activeIndex && i % stride !== 0 && i !== n - 1 && i !== dayBoundaryIndex) return null;
-                const size = i === activeIndex ? 4 : 2.5;
-                const opacity = i === activeIndex ? 1 : dashedLineOpacity;
-                return (
-                  <rect
-                    key={i}
-                    x={c.x - size}
-                    y={c.y - size}
-                    width={size * 2}
-                    height={size * 2}
-                    fill="#ffffff"
-                    fillOpacity={opacity}
-                    stroke={s.color}
-                    strokeOpacity={opacity}
-                    strokeWidth={1.5}
-                  />
-                );
-              })}
-
               <path
                 d={primaryPath}
                 fill="none"
@@ -451,8 +339,7 @@ export default function HourlyForecast({
             textAnchor={labelOnRight ? "start" : "end"}
             dominantBaseline="middle"
             fontSize={8.5}
-            fontWeight={item.italic ? 500 : 700}
-            fontStyle={item.italic ? "italic" : "normal"}
+            fontWeight={700}
             fill={item.color}
           >
             {item.text}

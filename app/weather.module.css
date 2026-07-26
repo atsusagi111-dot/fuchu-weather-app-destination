@@ -376,12 +376,6 @@
   gap: 6px;
 }
 
-.hourlyLegendGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
 .hourlyLegend {
   display: flex;
   gap: 12px;
@@ -395,18 +389,6 @@
   gap: 5px;
   font-size: 0.75rem;
   opacity: 0.9;
-}
-
-.legendLineSolid,
-.legendLineDashed {
-  display: inline-block;
-  width: 18px;
-  height: 0;
-  border-top: 2px solid currentColor;
-}
-
-.legendLineDashed {
-  border-top-style: dashed;
 }
 
 .hourlyIconRow {
@@ -462,12 +444,6 @@
   line-height: 1;
 }
 
-.hourlyIconEmojiSecondary {
-  font-size: 0.9rem;
-  line-height: 1;
-  opacity: 0.85;
-}
-
 .hourlyTooltip {
   min-height: 1.4em;
   font-size: 0.85rem;
@@ -488,11 +464,6 @@
   gap: 6px;
   flex-wrap: wrap;
   justify-content: center;
-}
-
-.hourlyTooltipLocation {
-  font-weight: 700;
-  opacity: 0.85;
 }
 
 .hourlyDot {
