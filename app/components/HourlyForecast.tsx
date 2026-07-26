@@ -82,6 +82,33 @@ function buildSegments(coords: ({ x: number; y: number } | null)[]): { x: number
   return segments;
 }
 
+// ホバー中の値ラベルが縦に重ならないよう、最小間隔をあけつつ
+// 元のグラフ上の高さ範囲に収まるようYを調整する。
+function declutterY(ys: number[], minGap: number, minY: number, maxY: number): number[] {
+  const order = ys.map((_, i) => i).sort((a, b) => ys[a] - ys[b]);
+  const adjusted = [...ys];
+  for (let k = 1; k < order.length; k++) {
+    const prev = order[k - 1];
+    const cur = order[k];
+    if (adjusted[cur] - adjusted[prev] < minGap) {
+      adjusted[cur] = adjusted[prev] + minGap;
+    }
+  }
+  if (order.length > 0) {
+    const lastIdx = order[order.length - 1];
+    if (adjusted[lastIdx] > maxY) {
+      const shift = adjusted[lastIdx] - maxY;
+      for (let i = 0; i < adjusted.length; i++) adjusted[i] -= shift;
+    }
+    const firstIdx = order[0];
+    if (adjusted[firstIdx] < minY) {
+      const shift = minY - adjusted[firstIdx];
+      for (let i = 0; i < adjusted.length; i++) adjusted[i] += shift;
+    }
+  }
+  return adjusted;
+}
+
 export default function HourlyForecast({
   primary,
   secondary,
@@ -150,6 +177,59 @@ export default function HourlyForecast({
 
   const active = activeIndex !== null ? primary.hours[activeIndex] : null;
   const activeSecondary = active && secondaryByKey ? secondaryByKey.get(hourKey(active)) ?? null : null;
+
+  // 各指標(気温・湿度・降水確率)の線の座標をまとめて計算しておき、
+  // 描画とホバー時のラベル配置の両方で使い回す。
+  const seriesData = METRICS.map((m) => {
+    const primaryCoords = primary.hours.map((h, i) => ({ x: xFor(i), y: yFor(normalize(m.key, h[m.key])) }));
+    const secondaryCoords: ({ x: number; y: number } | null)[] = primary.hours.map((h, i) => {
+      const match = secondaryByKey?.get(hourKey(h));
+      return match ? { x: xFor(i), y: yFor(normalize(m.key, match[m.key])) } : null;
+    });
+    return { ...m, primaryCoords, secondaryCoords };
+  });
+
+  const lineOpacity = activeIndex !== null ? 0.25 : 1;
+  const dashedLineOpacity = activeIndex !== null ? 0.25 : 0.6;
+
+  // ホバー中の点の近くに表示する「気温35°C」のような小さな数値ラベル。
+  const labelItems =
+    activeIndex !== null
+      ? seriesData.flatMap((s) => {
+          const items: { key: string; y: number; text: string; color: string; italic: boolean }[] = [];
+          const pc = s.primaryCoords[activeIndex];
+          if (pc) {
+            items.push({
+              key: `${s.key}-p`,
+              y: pc.y,
+              text: `${s.label} ${primary.hours[activeIndex][s.key]}${s.unit}`,
+              color: s.color,
+              italic: false,
+            });
+          }
+          const sc = s.secondaryCoords[activeIndex];
+          const matchHour = secondaryByKey?.get(hourKey(primary.hours[activeIndex]));
+          if (sc && matchHour) {
+            items.push({
+              key: `${s.key}-s`,
+              y: sc.y,
+              text: `${s.label} ${matchHour[s.key]}${s.unit}`,
+              color: s.color,
+              italic: true,
+            });
+          }
+          return items;
+        })
+      : [];
+
+  const labelYs = declutterY(
+    labelItems.map((it) => it.y),
+    11,
+    PAD_TOP + 4,
+    CHART_HEIGHT - PAD_BOTTOM - 4
+  );
+  const labelOnRight = activeIndex === null || xFor(activeIndex) <= CHART_WIDTH * 0.62;
+  const labelX = activeIndex !== null ? xFor(activeIndex) + (labelOnRight ? 6 : -6) : 0;
 
   return (
     <div className={styles.hourlyBlock}>
@@ -293,34 +373,29 @@ export default function HourlyForecast({
           />
         )}
 
-        {METRICS.map((m) => {
-          const primaryCoords = primary.hours.map((h, i) => ({ x: xFor(i), y: yFor(normalize(m.key, h[m.key])) }));
-          const primaryPath = buildSmoothPath(primaryCoords);
-
-          const secondaryCoords: ({ x: number; y: number } | null)[] = primary.hours.map((h, i) => {
-            const match = secondaryByKey?.get(hourKey(h));
-            return match ? { x: xFor(i), y: yFor(normalize(m.key, match[m.key])) } : null;
-          });
-          const secondarySegments = secondaryByKey ? buildSegments(secondaryCoords) : [];
+        {seriesData.map((s) => {
+          const primaryPath = buildSmoothPath(s.primaryCoords);
+          const secondarySegments = secondaryByKey ? buildSegments(s.secondaryCoords) : [];
 
           return (
-            <g key={m.key}>
+            <g key={s.key}>
               {secondarySegments.map((seg, i) => (
                 <path
                   key={i}
                   d={buildSmoothPath(seg)}
                   fill="none"
-                  stroke={m.color}
-                  strokeOpacity={0.6}
+                  stroke={s.color}
+                  strokeOpacity={dashedLineOpacity}
                   strokeWidth={2}
                   strokeDasharray="5 4"
                   strokeLinecap="round"
                 />
               ))}
-              {secondaryCoords.map((c, i) => {
+              {s.secondaryCoords.map((c, i) => {
                 if (!c) return null;
                 if (i !== activeIndex && i % stride !== 0 && i !== n - 1 && i !== dayBoundaryIndex) return null;
                 const size = i === activeIndex ? 4 : 2.5;
+                const opacity = i === activeIndex ? 1 : dashedLineOpacity;
                 return (
                   <rect
                     key={i}
@@ -329,24 +404,36 @@ export default function HourlyForecast({
                     width={size * 2}
                     height={size * 2}
                     fill="#ffffff"
-                    fillOpacity={0.9}
-                    stroke={m.color}
+                    fillOpacity={opacity}
+                    stroke={s.color}
+                    strokeOpacity={opacity}
                     strokeWidth={1.5}
                   />
                 );
               })}
 
-              <path d={primaryPath} fill="none" stroke={m.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-              {primaryCoords.map((c, i) => {
+              <path
+                d={primaryPath}
+                fill="none"
+                stroke={s.color}
+                strokeOpacity={lineOpacity}
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {s.primaryCoords.map((c, i) => {
                 if (i !== activeIndex && i % stride !== 0 && i !== n - 1 && i !== dayBoundaryIndex) return null;
+                const opacity = i === activeIndex ? 1 : lineOpacity;
                 return (
                   <circle
                     key={i}
                     cx={c.x}
                     cy={c.y}
                     r={i === activeIndex ? 4.5 : 2.5}
-                    fill={i === activeIndex ? m.color : "#ffffff"}
-                    stroke={m.color}
+                    fill={i === activeIndex ? s.color : "#ffffff"}
+                    fillOpacity={opacity}
+                    stroke={s.color}
+                    strokeOpacity={opacity}
                     strokeWidth={1.5}
                   />
                 );
@@ -354,6 +441,23 @@ export default function HourlyForecast({
             </g>
           );
         })}
+
+        {/* ホバー中の各線の値ラベル */}
+        {labelItems.map((item, i) => (
+          <text
+            key={item.key}
+            x={labelX}
+            y={labelYs[i]}
+            textAnchor={labelOnRight ? "start" : "end"}
+            dominantBaseline="middle"
+            fontSize={8.5}
+            fontWeight={item.italic ? 500 : 700}
+            fontStyle={item.italic ? "italic" : "normal"}
+            fill={item.color}
+          >
+            {item.text}
+          </text>
+        ))}
       </svg>
 
       <div className={styles.chartAxis}>
