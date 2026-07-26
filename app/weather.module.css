@@ -373,6 +373,22 @@
   justify-content: space-between;
 }
 
+.hourlyIconWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.hourlyDateBadge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  opacity: 0.85;
+  white-space: nowrap;
+  border-top: 1px dashed currentColor;
+  padding-top: 2px;
+}
+
 .hourlyIconItem {
   border: none;
   background: transparent;
@@ -459,6 +475,10 @@
   font-size: 0.65rem;
   opacity: 0.7;
   padding: 0 2px;
+}
+
+.chartAxis span {
+  white-space: nowrap;
 }
 
 .chartAxisActive {

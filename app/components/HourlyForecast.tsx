@@ -14,9 +14,31 @@ const METRICS: { key: MetricKey; label: string; color: string; unit: string; fix
 ];
 
 const CHART_WIDTH = 300;
-const CHART_HEIGHT = 96;
-const PAD_X = 10;
-const PAD_Y = 14;
+const CHART_HEIGHT = 116;
+const PAD_LEFT = 28;
+const PAD_RIGHT = 8;
+const PAD_TOP = 16;
+const PAD_BOTTOM = 18;
+
+function formatShortDate(dateKey: string): string {
+  const [, month, day] = dateKey.split("-");
+  return `${parseInt(month, 10)}/${parseInt(day, 10)}`;
+}
+
+// 表示するデータ点が多いとき(2日分をつなげた場合など)に、横軸ラベルが
+// 詰まって読めなくならないよう、間引いて表示する本数を決める。
+function labelStride(n: number): number {
+  if (n <= 8) return 1;
+  if (n <= 12) return 2;
+  return 3;
+}
+
+function findDayBoundaryIndex(hours: HourForecast[]): number {
+  for (let i = 1; i < hours.length; i++) {
+    if (hours[i].date !== hours[i - 1].date) return i;
+  }
+  return -1;
+}
 
 function buildSmoothPath(coords: { x: number; y: number }[]): string {
   if (coords.length === 0) return "";
@@ -36,18 +58,23 @@ function buildSmoothPath(coords: { x: number; y: number }[]): string {
 }
 
 function MetricChart({
-  values,
+  hours,
+  metricKey,
   color,
   fixedDomain,
+  dayBoundaryIndex,
   activeIndex,
   onActive,
 }: {
-  values: number[];
+  hours: HourForecast[];
+  metricKey: MetricKey;
   color: string;
   fixedDomain?: [number, number];
+  dayBoundaryIndex: number;
   activeIndex: number | null;
   onActive: (index: number | null) => void;
 }) {
+  const values = hours.map((h) => h[metricKey]);
   const n = values.length;
   if (n === 0) return null;
 
@@ -58,11 +85,17 @@ function MetricChart({
   const max = fixedDomain ? rawMax : rawMax + span * 0.15;
   const range = max - min || 1;
 
-  const xFor = (i: number) => (n === 1 ? CHART_WIDTH / 2 : PAD_X + (i * (CHART_WIDTH - PAD_X * 2)) / (n - 1));
-  const yFor = (v: number) => CHART_HEIGHT - PAD_Y - ((v - min) / range) * (CHART_HEIGHT - PAD_Y * 2);
+  const xFor = (i: number) =>
+    n === 1 ? CHART_WIDTH / 2 : PAD_LEFT + (i * (CHART_WIDTH - PAD_LEFT - PAD_RIGHT)) / (n - 1);
+  const yFor = (v: number) => CHART_HEIGHT - PAD_BOTTOM - ((v - min) / range) * (CHART_HEIGHT - PAD_TOP - PAD_BOTTOM);
 
   const coords = values.map((v, i) => ({ x: xFor(i), y: yFor(v) }));
   const path = buildSmoothPath(coords);
+
+  const midValue = fixedDomain ? (fixedDomain[0] + fixedDomain[1]) / 2 : (rawMin + rawMax) / 2;
+  const yTicks = Array.from(new Set([rawMin, midValue, rawMax].map((v) => Math.round(v))));
+
+  const stride = labelStride(n);
 
   function handlePointer(clientX: number, rect: DOMRect) {
     const relX = ((clientX - rect.left) / rect.width) * CHART_WIDTH;
@@ -83,34 +116,104 @@ function MetricChart({
       viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
       className={styles.chartSvg}
       role="img"
-      aria-hidden="true"
+      aria-label={`${hours[0]?.date ?? ""}以降の${metricKey}の推移`}
       onMouseMove={(e) => handlePointer(e.clientX, e.currentTarget.getBoundingClientRect())}
       onMouseLeave={() => onActive(null)}
       onClick={(e) => handlePointer(e.clientX, e.currentTarget.getBoundingClientRect())}
     >
+      {/* Y軸の目盛り線とラベル */}
+      {yTicks.map((tick) => {
+        const y = yFor(tick);
+        return (
+          <g key={tick}>
+            <line
+              x1={PAD_LEFT}
+              y1={y}
+              x2={CHART_WIDTH - PAD_RIGHT}
+              y2={y}
+              stroke="currentColor"
+              strokeOpacity={0.15}
+              strokeWidth={1}
+            />
+            <text x={PAD_LEFT - 4} y={y} textAnchor="end" dominantBaseline="middle" fontSize={8.5} fill="currentColor" fillOpacity={0.7}>
+              {tick}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* X軸・Y軸の軸線 */}
+      <line
+        x1={PAD_LEFT}
+        y1={PAD_TOP - 4}
+        x2={PAD_LEFT}
+        y2={CHART_HEIGHT - PAD_BOTTOM}
+        stroke="currentColor"
+        strokeOpacity={0.35}
+        strokeWidth={1}
+      />
+      <line
+        x1={PAD_LEFT}
+        y1={CHART_HEIGHT - PAD_BOTTOM}
+        x2={CHART_WIDTH - PAD_RIGHT}
+        y2={CHART_HEIGHT - PAD_BOTTOM}
+        stroke="currentColor"
+        strokeOpacity={0.35}
+        strokeWidth={1}
+      />
+
+      {/* 日付が変わる位置の目印 */}
+      {dayBoundaryIndex >= 0 && coords[dayBoundaryIndex] && (
+        <>
+          <line
+            x1={coords[dayBoundaryIndex].x}
+            y1={PAD_TOP - 4}
+            x2={coords[dayBoundaryIndex].x}
+            y2={CHART_HEIGHT - PAD_BOTTOM}
+            stroke="currentColor"
+            strokeOpacity={0.4}
+            strokeWidth={1}
+            strokeDasharray="3 3"
+          />
+          <text
+            x={coords[dayBoundaryIndex].x}
+            y={PAD_TOP - 6}
+            textAnchor="middle"
+            fontSize={8.5}
+            fill="currentColor"
+            fillOpacity={0.75}
+          >
+            {formatShortDate(hours[dayBoundaryIndex].date)}〜
+          </text>
+        </>
+      )}
+
       {activeIndex !== null && coords[activeIndex] && (
         <line
           x1={coords[activeIndex].x}
-          y1={PAD_Y / 2}
+          y1={PAD_TOP - 4}
           x2={coords[activeIndex].x}
-          y2={CHART_HEIGHT - PAD_Y / 2}
+          y2={CHART_HEIGHT - PAD_BOTTOM}
           stroke={color}
-          strokeOpacity={0.25}
+          strokeOpacity={0.3}
           strokeWidth={1.5}
         />
       )}
       <path d={path} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      {coords.map((c, i) => (
-        <circle
-          key={i}
-          cx={c.x}
-          cy={c.y}
-          r={i === activeIndex ? 5 : 3}
-          fill={i === activeIndex ? color : "#ffffff"}
-          stroke={color}
-          strokeWidth={2}
-        />
-      ))}
+      {coords.map((c, i) => {
+        if (i !== activeIndex && i % stride !== 0 && i !== n - 1 && i !== dayBoundaryIndex) return null;
+        return (
+          <circle
+            key={i}
+            cx={c.x}
+            cy={c.y}
+            r={i === activeIndex ? 5 : 3}
+            fill={i === activeIndex ? color : "#ffffff"}
+            stroke={color}
+            strokeWidth={2}
+          />
+        );
+      })}
     </svg>
   );
 }
@@ -128,6 +231,8 @@ export default function HourlyForecast({ title, hours }: { title: string; hours:
   }
 
   const active = activeIndex !== null ? hours[activeIndex] : null;
+  const dayBoundaryIndex = findDayBoundaryIndex(hours);
+  const stride = labelStride(hours.length);
 
   return (
     <div className={styles.hourlyBlock}>
@@ -135,26 +240,32 @@ export default function HourlyForecast({ title, hours }: { title: string; hours:
 
       <div className={styles.hourlyIconRow}>
         {hours.map((h, i) => (
-          <button
-            key={h.time}
-            type="button"
-            className={`${styles.hourlyIconItem} ${i === activeIndex ? styles.hourlyIconItemActive : ""}`}
-            onMouseEnter={() => setActiveIndex(i)}
-            onFocus={() => setActiveIndex(i)}
-            onClick={() => setActiveIndex(i)}
-          >
-            <span className={styles.hourlyIconTime}>{h.hourLabel}</span>
-            <span role="img" aria-label={h.categoryLabel} className={styles.hourlyIconEmoji}>
-              {CATEGORY_EMOJI[h.category]}
-            </span>
-          </button>
+          <div key={h.date + h.time} className={styles.hourlyIconWrap}>
+            {i === dayBoundaryIndex && (
+              <span className={styles.hourlyDateBadge}>{formatShortDate(h.date)}</span>
+            )}
+            <button
+              type="button"
+              className={`${styles.hourlyIconItem} ${i === activeIndex ? styles.hourlyIconItemActive : ""}`}
+              onMouseEnter={() => setActiveIndex(i)}
+              onFocus={() => setActiveIndex(i)}
+              onClick={() => setActiveIndex(i)}
+            >
+              <span className={styles.hourlyIconTime}>{h.hourLabel}</span>
+              <span role="img" aria-label={h.categoryLabel} className={styles.hourlyIconEmoji}>
+                {CATEGORY_EMOJI[h.category]}
+              </span>
+            </button>
+          </div>
         ))}
       </div>
 
       <div className={styles.hourlyTooltip}>
         {active ? (
           <>
-            <strong>{active.time}</strong>
+            <strong>
+              {formatShortDate(active.date)} {active.time}
+            </strong>
             <span className={styles.hourlyTooltipItem}>
               <i className={styles.hourlyDot} style={{ background: METRICS[0].color }} />
               気温 {active.temp}°C
@@ -181,16 +292,26 @@ export default function HourlyForecast({ title, hours }: { title: string; hours:
             {m.label}
           </div>
           <MetricChart
-            values={hours.map((h) => h[m.key])}
+            hours={hours}
+            metricKey={m.key}
             color={m.color}
             fixedDomain={m.fixedDomain}
+            dayBoundaryIndex={dayBoundaryIndex}
             activeIndex={activeIndex}
             onActive={setActiveIndex}
           />
           <div className={styles.chartAxis}>
             {hours.map((h, i) => (
-              <span key={h.time} className={i === activeIndex ? styles.chartAxisActive : ""}>
-                {h.hourLabel}
+              <span
+                key={h.date + h.time}
+                className={i === activeIndex ? styles.chartAxisActive : ""}
+                style={
+                  i % stride !== 0 && i !== hours.length - 1 && i !== dayBoundaryIndex
+                    ? { visibility: "hidden" }
+                    : undefined
+                }
+              >
+                {i === dayBoundaryIndex ? `${formatShortDate(h.date)} ${h.hourLabel}` : h.hourLabel}
               </span>
             ))}
           </div>

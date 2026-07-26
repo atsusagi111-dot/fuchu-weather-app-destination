@@ -161,6 +161,7 @@ export async function fetchForecast(
           const itemWeather = item.weather[0];
           const itemCategory = classifyWeather(itemWeather.id);
           return {
+            date: dateKey,
             time: `${pad(hour)}:00`,
             hourLabel: `${hour}時`,
             temp: Math.round(item.main.temp),

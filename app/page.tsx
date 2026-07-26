@@ -98,6 +98,22 @@ export default function Home() {
     return nearest;
   }, [destinationData, selectedDate]);
 
+  // 選択日だけだと（特に当日は残り時間が少なく）折れ線が短くなりすぎるため、
+  // 翌日分のデータをつなげて2日分のトレンドを表示する。
+  const fuchuHourlyWindow = useMemo(() => {
+    if (!data || !selectedDay) return [];
+    const idx = data.days.findIndex((d) => d.date === selectedDay.date);
+    const nextDay = idx >= 0 ? data.days[idx + 1] : undefined;
+    return [...selectedDay.hours, ...(nextDay?.hours ?? [])];
+  }, [data, selectedDay]);
+
+  const destinationHourlyWindow = useMemo(() => {
+    if (!destinationData || !destinationSelectedDay) return [];
+    const idx = destinationData.days.findIndex((d) => d.date === destinationSelectedDay.date);
+    const nextDay = idx >= 0 ? destinationData.days[idx + 1] : undefined;
+    return [...destinationSelectedDay.hours, ...(nextDay?.hours ?? [])];
+  }, [destinationData, destinationSelectedDay]);
+
   const bgClass = selectedDay ? backgroundClassFor(selectedDay.category) : styles.bgDefault;
   const showRainOverlay =
     selectedDay?.category === "light-rain" ||
@@ -340,9 +356,9 @@ export default function Home() {
 
             <section className={styles.hourlySection}>
               <h2 className={styles.sectionTitle}>時間ごとの天気予報</h2>
-              {selectedDay && <HourlyForecast title="府中市" hours={selectedDay.hours} />}
+              {selectedDay && <HourlyForecast title="府中市" hours={fuchuHourlyWindow} />}
               {destinationSelectedDay && destinationData && (
-                <HourlyForecast title={destinationData.location} hours={destinationSelectedDay.hours} />
+                <HourlyForecast title={destinationData.location} hours={destinationHourlyWindow} />
               )}
             </section>
 

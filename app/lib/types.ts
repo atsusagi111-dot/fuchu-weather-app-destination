@@ -6,6 +6,7 @@ export type WeatherCategory =
   | "thunderstorm";
 
 export type HourForecast = {
+  date: string; // YYYY-MM-DD (Asia/Tokyo) — 複数日をつなげて表示する際の日付境界の判定に使う
   time: string; // "HH:00" (Asia/Tokyo)
   hourLabel: string; // "6時" など、グラフの横軸表示用
   temp: number;
