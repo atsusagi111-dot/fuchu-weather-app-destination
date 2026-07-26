@@ -216,103 +216,6 @@ export default function Home() {
           </p>
         </header>
 
-        <section className={styles.destinationSection}>
-          <div className={styles.locationLabel}>目的地の天気</div>
-          <form className={styles.destinationForm} onSubmit={handleDestinationSearch}>
-            <input
-              type="text"
-              className={styles.destinationInput}
-              placeholder="例：東京都渋谷区 / 神奈川県横浜市"
-              value={destinationInput}
-              onChange={(e) => setDestinationInput(e.target.value)}
-            />
-            <button type="submit" className={styles.destinationButton}>
-              検索
-            </button>
-            {hasSearchedDestination && (
-              <button
-                type="button"
-                className={styles.destinationClearButton}
-                onClick={handleDestinationClear}
-              >
-                クリア
-              </button>
-            )}
-          </form>
-
-          <p className={styles.adviceHint}>
-            🚲 出発時間と帰宅時間を入力すると、上のカレンダーで選んでいる日付（{selectedDay ? formatDateLabel(selectedDay) : "未選択"}）を対象に、自転車で行くべきかのアドバイスが表示されます。目的地は入力しなくても大丈夫です（未入力の場合は府中市の天気で判断します）。
-          </p>
-
-          <div className={styles.timeRow}>
-            <label className={styles.timeField}>
-              <span className={styles.timeFieldLabel}>出発時間</span>
-              <input
-                type="time"
-                className={styles.timeInput}
-                value={departureTime}
-                onChange={(e) => setDepartureTime(e.target.value)}
-              />
-            </label>
-            <label className={styles.timeField}>
-              <span className={styles.timeFieldLabel}>帰宅時間</span>
-              <input
-                type="time"
-                className={styles.timeInput}
-                value={returnTime}
-                onChange={(e) => setReturnTime(e.target.value)}
-              />
-            </label>
-          </div>
-
-          {destinationLoading && (
-            <div className={styles.message}>目的地の天気を取得中...</div>
-          )}
-
-          {destinationError && (
-            <div className={`${styles.message} ${styles.messageError}`}>
-              {destinationError}
-            </div>
-          )}
-
-          {destinationSelectedDay && destinationData && (
-            <section className={styles.card}>
-              <div className={styles.locationLabel}>目的地（{destinationData.location}）</div>
-              <div className={styles.cardDate}>{formatDateLabel(destinationSelectedDay)}</div>
-              <div
-                className={styles.cardIcon}
-                role="img"
-                aria-label={destinationSelectedDay.categoryLabel}
-              >
-                {CATEGORY_EMOJI[destinationSelectedDay.category]}
-              </div>
-              {CATEGORY_RAINDROPS[destinationSelectedDay.category] && (
-                <div className={styles.rainDrops} aria-hidden="true">
-                  {CATEGORY_RAINDROPS[destinationSelectedDay.category]}
-                </div>
-              )}
-              <div className={styles.cardTemp}>{destinationSelectedDay.temp}°C</div>
-              <div className={styles.cardDescription}>
-                {destinationSelectedDay.categoryLabel}
-              </div>
-              <div className={styles.cardMinMax}>
-                最高 {destinationSelectedDay.tempMax}° / 最低 {destinationSelectedDay.tempMin}°
-              </div>
-
-              <div className={styles.statsRow}>
-                <div className={styles.statBox}>
-                  <div className={styles.statLabel}>湿度</div>
-                  <div className={styles.statValue}>{destinationSelectedDay.humidity}%</div>
-                </div>
-                <div className={styles.statBox}>
-                  <div className={styles.statLabel}>降水確率</div>
-                  <div className={styles.statValue}>{destinationSelectedDay.pop}%</div>
-                </div>
-              </div>
-            </section>
-          )}
-        </section>
-
         {loading && <div className={styles.message}>読み込み中...</div>}
 
         {errorMsg && (
@@ -355,6 +258,103 @@ export default function Home() {
             </div>
 
             {snapNotice && <div className={styles.message}>{snapNotice}</div>}
+
+            <section className={styles.destinationSection}>
+              <div className={styles.locationLabel}>目的地の天気</div>
+              <form className={styles.destinationForm} onSubmit={handleDestinationSearch}>
+                <input
+                  type="text"
+                  className={styles.destinationInput}
+                  placeholder="例：東京都渋谷区 / 神奈川県横浜市"
+                  value={destinationInput}
+                  onChange={(e) => setDestinationInput(e.target.value)}
+                />
+                <button type="submit" className={styles.destinationButton}>
+                  検索
+                </button>
+                {hasSearchedDestination && (
+                  <button
+                    type="button"
+                    className={styles.destinationClearButton}
+                    onClick={handleDestinationClear}
+                  >
+                    クリア
+                  </button>
+                )}
+              </form>
+
+              <p className={styles.adviceHint}>
+                🚲 出発時間と帰宅時間を入力すると、上のカレンダーで選んでいる日付（{selectedDay ? formatDateLabel(selectedDay) : "未選択"}）を対象に、自転車で行くべきかのアドバイスが表示されます。目的地は入力しなくても大丈夫です（未入力の場合は府中市の天気で判断します）。
+              </p>
+
+              <div className={styles.timeRow}>
+                <label className={styles.timeField}>
+                  <span className={styles.timeFieldLabel}>出発時間</span>
+                  <input
+                    type="time"
+                    className={styles.timeInput}
+                    value={departureTime}
+                    onChange={(e) => setDepartureTime(e.target.value)}
+                  />
+                </label>
+                <label className={styles.timeField}>
+                  <span className={styles.timeFieldLabel}>帰宅時間</span>
+                  <input
+                    type="time"
+                    className={styles.timeInput}
+                    value={returnTime}
+                    onChange={(e) => setReturnTime(e.target.value)}
+                  />
+                </label>
+              </div>
+
+              {destinationLoading && (
+                <div className={styles.message}>目的地の天気を取得中...</div>
+              )}
+
+              {destinationError && (
+                <div className={`${styles.message} ${styles.messageError}`}>
+                  {destinationError}
+                </div>
+              )}
+
+              {destinationSelectedDay && destinationData && (
+                <section className={styles.card}>
+                  <div className={styles.locationLabel}>目的地（{destinationData.location}）</div>
+                  <div className={styles.cardDate}>{formatDateLabel(destinationSelectedDay)}</div>
+                  <div
+                    className={styles.cardIcon}
+                    role="img"
+                    aria-label={destinationSelectedDay.categoryLabel}
+                  >
+                    {CATEGORY_EMOJI[destinationSelectedDay.category]}
+                  </div>
+                  {CATEGORY_RAINDROPS[destinationSelectedDay.category] && (
+                    <div className={styles.rainDrops} aria-hidden="true">
+                      {CATEGORY_RAINDROPS[destinationSelectedDay.category]}
+                    </div>
+                  )}
+                  <div className={styles.cardTemp}>{destinationSelectedDay.temp}°C</div>
+                  <div className={styles.cardDescription}>
+                    {destinationSelectedDay.categoryLabel}
+                  </div>
+                  <div className={styles.cardMinMax}>
+                    最高 {destinationSelectedDay.tempMax}° / 最低 {destinationSelectedDay.tempMin}°
+                  </div>
+
+                  <div className={styles.statsRow}>
+                    <div className={styles.statBox}>
+                      <div className={styles.statLabel}>湿度</div>
+                      <div className={styles.statValue}>{destinationSelectedDay.humidity}%</div>
+                    </div>
+                    <div className={styles.statBox}>
+                      <div className={styles.statLabel}>降水確率</div>
+                      <div className={styles.statValue}>{destinationSelectedDay.pop}%</div>
+                    </div>
+                  </div>
+                </section>
+              )}
+            </section>
 
             {selectedDay && (
               <section className={styles.card}>
