@@ -42,6 +42,12 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [snapNotice, setSnapNotice] = useState<string | null>(null);
 
+  const [destinationInput, setDestinationInput] = useState("");
+  const [destinationData, setDestinationData] = useState<WeatherApiResponse | null>(null);
+  const [destinationError, setDestinationError] = useState<string | null>(null);
+  const [destinationLoading, setDestinationLoading] = useState(false);
+  const [hasSearchedDestination, setHasSearchedDestination] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -82,6 +88,28 @@ export default function Home() {
     [data, selectedDate]
   );
 
+  // 目的地側も同じ選択日(カレンダー/日別ボタン)に追従させる。
+  // 完全一致がなければ最も近い予報日にスナップし、府中市側の挙動と揃える。
+  const destinationSelectedDay = useMemo(() => {
+    if (!destinationData || destinationData.days.length === 0) return null;
+
+    const exact = destinationData.days.find((d) => d.date === selectedDate);
+    if (exact) return exact;
+    if (!selectedDate) return destinationData.days[0];
+
+    const targetMs = new Date(selectedDate).getTime();
+    let nearest = destinationData.days[0];
+    let bestDiff = Infinity;
+    for (const day of destinationData.days) {
+      const diff = Math.abs(new Date(day.date).getTime() - targetMs);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        nearest = day;
+      }
+    }
+    return nearest;
+  }, [destinationData, selectedDate]);
+
   const bgClass = selectedDay ? backgroundClassFor(selectedDay.category) : styles.bgDefault;
   const showRainOverlay =
     selectedDay?.category === "light-rain" ||
@@ -114,6 +142,50 @@ export default function Home() {
     setSnapNotice(
       `${value} の予報はまだ提供されていないため、直近の予報日（${formatDateLabel(nearest)}）を表示しています。`
     );
+  }
+
+  async function handleDestinationSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const q = destinationInput.trim();
+
+    if (!q) {
+      setHasSearchedDestination(false);
+      setDestinationData(null);
+      setDestinationError(null);
+      return;
+    }
+
+    setHasSearchedDestination(true);
+    setDestinationLoading(true);
+    setDestinationError(null);
+
+    try {
+      const res = await fetch(`/api/destination-weather?q=${encodeURIComponent(q)}`);
+      const json = await res.json();
+
+      if (!res.ok) {
+        setDestinationData(null);
+        setDestinationError(
+          json.error ?? "目的地の天気情報を取得できませんでした。都道府県名や市区町村名を確認してください。"
+        );
+        setDestinationLoading(false);
+        return;
+      }
+
+      setDestinationData(json as WeatherApiResponse);
+      setDestinationLoading(false);
+    } catch {
+      setDestinationData(null);
+      setDestinationError("目的地の天気情報を取得できませんでした。都道府県名や市区町村名を確認してください。");
+      setDestinationLoading(false);
+    }
+  }
+
+  function handleDestinationClear() {
+    setDestinationInput("");
+    setDestinationData(null);
+    setDestinationError(null);
+    setHasSearchedDestination(false);
   }
 
   return (
@@ -173,6 +245,7 @@ export default function Home() {
 
             {selectedDay && (
               <section className={styles.card}>
+                <div className={styles.locationLabel}>現在地（府中市）</div>
                 <div className={styles.cardDate}>{formatDateLabel(selectedDay)}</div>
                 <div
                   className={styles.cardIcon}
@@ -204,6 +277,78 @@ export default function Home() {
                 </div>
               </section>
             )}
+
+            <section className={styles.destinationSection}>
+              <div className={styles.locationLabel}>目的地の天気</div>
+              <form className={styles.destinationForm} onSubmit={handleDestinationSearch}>
+                <input
+                  type="text"
+                  className={styles.destinationInput}
+                  placeholder="例：東京都渋谷区 / 神奈川県横浜市"
+                  value={destinationInput}
+                  onChange={(e) => setDestinationInput(e.target.value)}
+                />
+                <button type="submit" className={styles.destinationButton}>
+                  検索
+                </button>
+                {hasSearchedDestination && (
+                  <button
+                    type="button"
+                    className={styles.destinationClearButton}
+                    onClick={handleDestinationClear}
+                  >
+                    クリア
+                  </button>
+                )}
+              </form>
+
+              {destinationLoading && (
+                <div className={styles.message}>目的地の天気を取得中...</div>
+              )}
+
+              {destinationError && (
+                <div className={`${styles.message} ${styles.messageError}`}>
+                  {destinationError}
+                </div>
+              )}
+
+              {destinationSelectedDay && destinationData && (
+                <section className={styles.card}>
+                  <div className={styles.locationLabel}>目的地（{destinationData.location}）</div>
+                  <div className={styles.cardDate}>{formatDateLabel(destinationSelectedDay)}</div>
+                  <div
+                    className={styles.cardIcon}
+                    role="img"
+                    aria-label={destinationSelectedDay.categoryLabel}
+                  >
+                    {CATEGORY_EMOJI[destinationSelectedDay.category]}
+                  </div>
+                  {CATEGORY_RAINDROPS[destinationSelectedDay.category] && (
+                    <div className={styles.rainDrops} aria-hidden="true">
+                      {CATEGORY_RAINDROPS[destinationSelectedDay.category]}
+                    </div>
+                  )}
+                  <div className={styles.cardTemp}>{destinationSelectedDay.temp}°C</div>
+                  <div className={styles.cardDescription}>
+                    {destinationSelectedDay.categoryLabel}
+                  </div>
+                  <div className={styles.cardMinMax}>
+                    最高 {destinationSelectedDay.tempMax}° / 最低 {destinationSelectedDay.tempMin}°
+                  </div>
+
+                  <div className={styles.statsRow}>
+                    <div className={styles.statBox}>
+                      <div className={styles.statLabel}>湿度</div>
+                      <div className={styles.statValue}>{destinationSelectedDay.humidity}%</div>
+                    </div>
+                    <div className={styles.statBox}>
+                      <div className={styles.statLabel}>降水確率</div>
+                      <div className={styles.statValue}>{destinationSelectedDay.pop}%</div>
+                    </div>
+                  </div>
+                </section>
+              )}
+            </section>
 
             <p className={styles.footer}>
               最終更新: {data.updatedAt ? new Date(data.updatedAt).toLocaleString("ja-JP") : "-"}
