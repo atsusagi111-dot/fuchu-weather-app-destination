@@ -316,6 +316,18 @@ export default function Home() {
                 </div>
               )}
 
+              {departureTime && returnTime && (
+                <div className={styles.adviceSection}>
+                  <CyclingAdvice
+                    locationLabel={adviceLocationLabel}
+                    hours={adviceHours}
+                    targetDate={adviceTargetDate}
+                    departureTime={departureTime}
+                    returnTime={returnTime}
+                  />
+                </div>
+              )}
+
               {destinationSelectedDay && destinationData && (
                 <section className={styles.card}>
                   <div className={styles.locationLabel}>目的地（{destinationData.location}）</div>
@@ -399,18 +411,6 @@ export default function Home() {
                 }
               />
             </section>
-
-            {departureTime && returnTime && (
-              <section className={styles.adviceSection}>
-                <CyclingAdvice
-                  locationLabel={adviceLocationLabel}
-                  hours={adviceHours}
-                  targetDate={adviceTargetDate}
-                  departureTime={departureTime}
-                  returnTime={returnTime}
-                />
-              </section>
-            )}
 
             <p className={styles.footer}>
               最終更新: {data.updatedAt ? new Date(data.updatedAt).toLocaleString("ja-JP") : "-"}
